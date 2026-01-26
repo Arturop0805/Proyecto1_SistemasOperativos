@@ -4,6 +4,7 @@
 
 package com.mycompany.so_proyecto1;
 import EstructurasDeDatos.ListaSimple;
+import EstructurasDeDatos.Cola;
 /**
  *
  * @author Arturo
@@ -13,21 +14,24 @@ public class SO_Proyecto1 {
     public static void main(String[] args) {
         
          ListaSimple<Integer> lista = new ListaSimple();
+         Cola<Integer> cola = new Cola();
         
-         lista.agregarInicio(10);
-         lista.agregarInicio(8);
-         lista.agregarInicio(6);
-         lista.agregarInicio(4);
-         lista.agregarInicio(2);
         
-         lista.agregarFinal(12);
-        lista.eliminarFinal();
-    
+        
          
-         lista.eliminarInicio();
-         lista.print();
+        cola.encolar(5);
+        cola.encolar(3);
+        cola.encolar(2);
+        cola.encolar(1);
          
+        
          
+       cola.imprimir();
+         
+       cola.desencolar();
+       
+       cola.imprimir();
+               
          
     }
 }

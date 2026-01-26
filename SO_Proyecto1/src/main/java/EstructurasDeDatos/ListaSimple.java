@@ -87,34 +87,37 @@ public class ListaSimple<T> {
     
     
     //NO USAR TODAVIA, AUN NO FUNCIONA
-    public void eliminarPorIndice(Integer indice) { 
-        
-        
-        if (this.EsVacia()){
-            System.out.println("La lista esta vacia");
-            return;
-        }
-        
-        if (indice > this.tamaño){
-            System.out.println("El indice proporcionado es mayor al tamaño de lista");
-            return;
-        }
-        
-        if (indice == 0){
-            this.eliminarInicio();
-        }
-        
-        int contador = 0;
-        
-        Nodo auxiliar = this.cabeza;
-        
-        while (contador <= this.tamaño){
-            if (contador+1 == indice){
-                
-             auxiliar.siguiente = auxiliar.siguiente.siguiente;
-            }
-        }
+    public void eliminarPorIndice(Integer indice) {
+    // Validar si la lista está vacía
+    if (this.EsVacia()) {
+        System.out.println("La lista esta vacia");
+        return;
     }
+    
+    // Validar índice: debe ser >= 0 y < tamaño
+    if (indice < 0 || indice >= this.tamaño) {
+        System.out.println("El indice proporcionado es invalido (fuera de rango)");
+        return;
+    }
+    
+    // Caso especial: eliminar la cabeza (índice 0)
+    if (indice == 0) {
+        this.eliminarInicio();  // Asumiendo que este método ya maneja la actualización de tamaño
+        return;
+    }
+    
+    // Recorrer hasta el nodo anterior al índice
+    Nodo auxiliar = this.cabeza;
+    for (int contador = 0; contador < indice - 1; contador++) {
+        auxiliar = auxiliar.siguiente;
+    }
+    
+    // Eliminar el nodo: saltar el siguiente
+    auxiliar.siguiente = auxiliar.siguiente.siguiente;
+    
+    // Decrementar el tamaño
+    this.tamaño--;
+}
     
     public void eliminarFinal(){
         
