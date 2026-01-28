@@ -3,7 +3,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package EstructurasDeDatos;
-
+import Modelo.Proceso;
 /**
  *
  * @author Arturo
@@ -50,6 +50,8 @@ public class Cola<T> {
         tamano--;
         return datoRemovido;
     }
+    
+   
 
     // Método para verificar si la cola está vacía
     public boolean estaVacia() {

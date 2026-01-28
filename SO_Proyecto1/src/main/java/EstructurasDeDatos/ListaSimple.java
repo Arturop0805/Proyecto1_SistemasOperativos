@@ -142,7 +142,7 @@ public class ListaSimple<T> {
         auxiliar.siguiente = null;
     }
     
-    public void print() {
+    public void imprimir() {
         Nodo<T> auxiliar = this.cabeza;
         
         while (auxiliar != null){
