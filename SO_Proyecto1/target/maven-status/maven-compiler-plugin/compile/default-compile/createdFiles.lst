@@ -1,0 +1,12 @@
+Modelo\Proceso.class
+com\mycompany\so_proyecto1\SO_Proyecto1.class
+Simulacion\Config.class
+Interfaces\Principal.class
+Simulacion\Reloj.class
+ComponentesVisuales\LabelRedondo.class
+Modelo\PCB.class
+EstructurasDeDatos\ListaSimple.class
+Modelo\Estado.class
+Simulacion\Administrador.class
+EstructurasDeDatos\Cola.class
+EstructurasDeDatos\Nodo.class
