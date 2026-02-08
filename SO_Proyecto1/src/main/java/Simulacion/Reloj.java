@@ -1,4 +1,7 @@
 
+
+
+
 /*
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
@@ -18,14 +21,20 @@ public class Reloj extends Thread {
     
     private int cicloActual;
     private boolean ejecutando;
-    private int velocidadMs; // Duración real de un ciclo simulado en ms
+    private boolean pausado; // Nuevo flag
+    private int velocidadMs;
     
     private static Reloj instancia;
 
     private Reloj() {
         this.cicloActual = 0;
         this.ejecutando = false;
-        this.velocidadMs = 500; // Por defecto 1 seg = 1 ciclo
+        this.pausado = false;
+        this.velocidadMs = 1000;
+        
+        if (Config.VELOCIDAD_RELOJ > 0) {
+            this.velocidadMs = Config.VELOCIDAD_RELOJ;
+        }
     }
     
     public static Reloj getInstancia() {
@@ -42,16 +51,17 @@ public class Reloj extends Thread {
         
         while (ejecutando) {
             try {
-                // 1. Notificar estado (Más adelante aquí llamaremos al Kernel)
-                System.out.println("[RELOJ] Ciclo: " + cicloActual);
+                if (pausado) {
+                    Thread.sleep(100); // Espera pasiva mientras está pausado
+                    continue;
+                }
+
+                // 1. Notificar al Kernel
+                Administrador.getInstancia().ejecutarCiclo(cicloActual);
                 
-                // 2. Esperar tiempo real
+                // 2. Avanzar tiempo
                 Thread.sleep(velocidadMs);
-                
-                // 3. Avanzar ciclo simulado
                 cicloActual++;
-                
-                
                 
             } catch (InterruptedException e) {
                 System.out.println(">>> RELOJ INTERRUMPIDO <<<");
@@ -60,24 +70,13 @@ public class Reloj extends Thread {
         }
     }
     
-    public void detener() {
-        this.ejecutando = false;
-    }
+    // --- Control de Pausa ---
+    public void pausar() { this.pausado = true; }
+    public void reanudar() { this.pausado = false; }
+    public boolean isPausado() { return pausado; }
     
-    public int getCicloActual() {
-        return cicloActual;
-    }
-    
-    public void setVelocidad(int ms) {
-        this.velocidadMs = ms;
-    }
+    public void detener() { this.ejecutando = false; }
+    public int getCicloActual() { return cicloActual; }
+    public void setVelocidad(int ms) { this.velocidadMs = ms; }
 }
-
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-
-
-
 

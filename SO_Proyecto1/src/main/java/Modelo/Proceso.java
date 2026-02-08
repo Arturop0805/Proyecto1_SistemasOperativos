@@ -1,6 +1,15 @@
 package Modelo;
 import Modelo.PCB;
 /**
+ *
+ * @author tomas
+ */
+
+/**
+ * El Proceso actúa como su propio PCB.
+ * Contiene identificadores, estado y contadores de ejecución.
+ */
+/**
  * El Proceso actúa como su propio PCB.
  * Contiene identificadores, estado y contadores de ejecución.
  */
@@ -25,7 +34,7 @@ public class Proceso {
     private int mar;                     // Memory Address Register
     private Estado estado;               
     private int ciclosBloqueadoRestantes;
-    private long tiempoLlegada;          
+    private long tiempoLlegada;          // <--- Variable necesaria para el error
 
     public Proceso(String id, String nombre, int totalInstrucciones, int deadline, int prioridad, boolean esSistema, int periodo) {
         this.id = id;
@@ -56,7 +65,6 @@ public class Proceso {
 
     // --- Lógica de CPU ---
 
-    // Ejecuta 1 ciclo de instrucción
     public boolean ejecutarInstruccion() {
         if (pc < totalInstrucciones) {
             pc++;
@@ -83,8 +91,12 @@ public class Proceso {
         return ciclosBloqueadoRestantes == 0; 
     }
 
-    // --- Getters ---
+    // --- Getters y Setters ---
     
+    // ESTE ES EL MÉTODO QUE FALTABA Y CAUSABA EL ERROR:
+    public void setTiempoLlegada(long t) { this.tiempoLlegada = t; }
+    public long getTiempoLlegada() { return tiempoLlegada; }
+
     public String getId() { return id; }
     public String getNombre() { return nombre; }
     public int getPrioridad() { return prioridadInicial; }
