@@ -29,12 +29,14 @@ public class Principal extends JFrame {
 
     // Singleton para acceso global
     private static Principal instancia;
-
+    
     // Componentes Dinámicos (Los que cambian con el tiempo)
     private JLabel lblReloj;
     private JLabel lblCpuId;
     private JLabel lblCpuNombre;
     private JProgressBar barraProgresoCPU;
+    private JPanel panelInfoCPU;
+    private Proceso procesoEnCPU = null;
     private JProgressBar barraMemoria;
     private JComboBox<String> comboPolitica;
     // Contenedores para las colas (Aquí agregaremos los LabelRedondo)
@@ -100,27 +102,46 @@ public class Principal extends JFrame {
         panelCentral.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         // Columna 1: CPU y Estado
-        JPanel col1 = crearPanelColumna("Unidad Central de Procesamiento (CPU)");
-        
-        JPanel panelCPU = new JPanel(new GridLayout(4, 1, 5, 5));
-        panelCPU.setBorder(BorderFactory.createTitledBorder("Ejecutando Ahora"));
-        
-        lblCpuId = new JLabel("ID: [IDLE]", SwingConstants.CENTER);
-        lblCpuId.setFont(new Font("Arial", Font.BOLD, 20));
-        lblCpuId.setForeground(new Color(0, 128, 0));
-        
-        lblCpuNombre = new JLabel("Esperando procesos...", SwingConstants.CENTER);
-        
+       panelInfoCPU = new JPanel(new GridLayout(4, 1, 5, 5)); 
+       panelInfoCPU.setBorder(new TitledBorder("CPU - Ejecución"));
+
+        // 2. Inicializamos los componentes (igual que antes)
+        lblCpuId = new JLabel("ID: [Vacío]");
+        lblCpuNombre = new JLabel("Proceso: [Ninguno]");
         barraProgresoCPU = new JProgressBar(0, 100);
         barraProgresoCPU.setStringPainted(true);
         barraProgresoCPU.setString("CPU Libre");
 
-        panelCPU.add(lblCpuId);
-        panelCPU.add(lblCpuNombre);
-        panelCPU.add(new JLabel("Progreso de Instrucción:"));
-        panelCPU.add(barraProgresoCPU);
+        // 3. Agregamos al panel
+        panelInfoCPU.add(new JLabel("ID Proceso:"));
+        panelInfoCPU.add(lblCpuId);
+        panelInfoCPU.add(lblCpuNombre);
+        panelInfoCPU.add(barraProgresoCPU);
+
+        // 4. --- LÓGICA DEL CLICK (NUEVO) ---
+        // Creamos el oyente (Listener) para detectar el click
+        java.awt.event.MouseAdapter eventoClickCPU = new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                // Si hay un proceso en la variable, abrimos la ventana
+                if (procesoEnCPU != null) {
+                    Interfaces.VentanaInfoProceso ventana = new Interfaces.VentanaInfoProceso(procesoEnCPU);
+                    ventana.setVisible(true);
+                } else {
+                    // Si no hay nada, mostramos un mensaje simple
+                    JOptionPane.showMessageDialog(null, "La CPU está libre (IDLE).");
+                }
+            }
+        };
+
+        // Asignamos el evento a TODOS los elementos para asegurar que el click funcione
+        // sin importar dónde toque el usuario (en el borde, en el texto o en la barra)
+        panelInfoCPU.addMouseListener(eventoClickCPU);
+        lblCpuId.addMouseListener(eventoClickCPU);
+        lblCpuNombre.addMouseListener(eventoClickCPU);
+        barraProgresoCPU.addMouseListener(eventoClickCPU);
         
-        col1.add(panelCPU, BorderLayout.NORTH);
+        
         
         // Columna 2: Colas RAM (Listos y Bloqueados)
         JPanel col2 = crearPanelColumna("Gestión de Colas (RAM)");
@@ -162,7 +183,7 @@ public class Principal extends JFrame {
         col3.add(panelMemInfo, BorderLayout.NORTH);
         col3.add(scrollSwap, BorderLayout.CENTER);
 
-        panelCentral.add(col1);
+        panelCentral.add(panelInfoCPU);
         panelCentral.add(col2);
         panelCentral.add(col3);
         add(panelCentral, BorderLayout.CENTER);
@@ -229,26 +250,36 @@ public class Principal extends JFrame {
     }
 
     public void actualizarCPU(Proceso p) {
-        SwingUtilities.invokeLater(() -> {
-            if (p != null) {
-                lblCpuId.setText(p.getId());
-                lblCpuNombre.setText(p.getNombre());
-                lblCpuId.setForeground(Color.RED); // Ocupado
-                
-                // Calculamos porcentaje completado
-                int total = p.getInstruccionesRestantes() + p.getPC();
-                int progreso = (int) ((p.getPC() / (double) total) * 100);
-                barraProgresoCPU.setValue(progreso);
-                barraProgresoCPU.setString("Ejecutando: " + p.getPC() + " / " + total);
-            } else {
-                lblCpuId.setText("IDLE");
-                lblCpuNombre.setText("Esperando procesos...");
-                lblCpuId.setForeground(new Color(0, 128, 0)); // Verde
-                barraProgresoCPU.setValue(0);
-                barraProgresoCPU.setString("CPU Libre");
+    this.procesoEnCPU = p; // Guardamos referencia
+
+    SwingUtilities.invokeLater(() -> {
+        if (p != null) {
+            lblCpuId.setText(p.getId());
+            lblCpuNombre.setText(p.getNombre());
+            
+            barraProgresoCPU.setValue(p.getTotalInstrucciones() - p.getInstruccionesRestantes());
+            barraProgresoCPU.setMaximum(p.getTotalInstrucciones());
+            barraProgresoCPU.setString(p.getInstruccionesRestantes() + " instr. restantes");
+
+            // AHORA SÍ FUNCIONA ESTA LÍNEA:
+            if (panelInfoCPU != null) {
+                panelInfoCPU.setCursor(new Cursor(Cursor.HAND_CURSOR));
+                panelInfoCPU.setBackground(new Color(230, 240, 255)); // Un ligero azul para indicar actividad
             }
-        });
-    }
+
+        } else {
+            lblCpuId.setText("IDLE");
+            lblCpuNombre.setText("Esperando...");
+            barraProgresoCPU.setValue(0);
+            barraProgresoCPU.setString("CPU Libre");
+
+            if (panelInfoCPU != null) {
+                panelInfoCPU.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                panelInfoCPU.setBackground(null); // Volver al color normal
+            }
+        }
+    });
+}
     
     /**
      * Redibuja completamente la cola de listos en la GUI.
@@ -266,7 +297,7 @@ public class Principal extends JFrame {
                     
                     // Crear burbuja visual
                     Color colorBorde = p.esDeSistema() ? Color.RED : Color.BLUE;
-                    LabelRedondo lbl = new LabelRedondo(p.getId(), colorBorde);
+                    LabelRedondo lbl = new LabelRedondo(p, Color.BLUE);
                     lbl.setToolTipText(p.getNombre() + " (Prio: " + p.getPrioridad() + ")");
                     lbl.setPreferredSize(new Dimension(60, 60));
                     
@@ -293,7 +324,7 @@ public class Principal extends JFrame {
                     Proceso p = actual.dato;
                     
                     // Burbuja Gris/Roja para indicar bloqueo
-                    LabelRedondo lbl = new LabelRedondo(p.getId(), Color.MAGENTA);
+                    LabelRedondo lbl = new LabelRedondo(p, Color.BLUE);
                     lbl.setText(p.getId() + " (I/O)"); // Mostrar que espera I/O
                     lbl.setToolTipText("Esperando E/S...");
                     lbl.setPreferredSize(new Dimension(70, 60));

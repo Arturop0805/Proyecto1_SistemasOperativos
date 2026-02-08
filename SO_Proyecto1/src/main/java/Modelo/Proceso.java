@@ -93,7 +93,9 @@ public class Proceso {
 
     // --- Getters y Setters ---
     
-    // ESTE ES EL MÉTODO QUE FALTABA Y CAUSABA EL ERROR:
+    public Integer getTotalInstrucciones(){return this.totalInstrucciones;}
+    public Integer getMAR(){return this.mar;}
+    
     public void setTiempoLlegada(long t) { this.tiempoLlegada = t; }
     public long getTiempoLlegada() { return tiempoLlegada; }
 

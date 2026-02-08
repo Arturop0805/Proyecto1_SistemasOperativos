@@ -1,9 +1,14 @@
+Interfaces\VentanaInfoProceso$2.class
+Interfaces\VentanaInfoProceso$1.class
 Simulacion\Config.class
+ComponentesVisuales\LabelRedondo$1.class
 Interfaces\Principal.class
 Simulacion\Reloj.class
 Modelo\PCB.class
+Interfaces\Principal$1.class
 Simulacion\Administrador.class
 Utilidades\GeneradorProcesos.class
+Interfaces\VentanaInfoProceso.class
 Modelo\Proceso.class
 com\mycompany\so_proyecto1\SO_Proyecto1.class
 ComponentesVisuales\LabelRedondo.class
