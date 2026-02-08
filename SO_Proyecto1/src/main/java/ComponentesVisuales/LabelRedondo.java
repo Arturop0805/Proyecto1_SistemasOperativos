@@ -4,48 +4,61 @@
  */
 package ComponentesVisuales;
 
+import Interfaces.VentanaInfoProceso; // Importamos la nueva ventana
+import Modelo.Proceso;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class LabelRedondo extends JLabel {
 
-    private int radio = 15; // Qué tan redondeado lo quieres
-    private Color colorBorde = Color.BLACK;
-    private int grosorBorde = 2;
+    private int radio = 15;
+    private Color colorBorde;
+    private Proceso procesoAsociado; // Referencia al objeto real
 
-   
-    public LabelRedondo(String texto, Color colorBorde) {
-        super(texto);
+    // --- Constructor Modificado ---
+    // Ahora recibe el OBJETO Proceso, no solo el String
+    public LabelRedondo(Proceso proceso, Color colorBorde) {
+        super(proceso.getId()); // Texto inicial
+        this.procesoAsociado = proceso;
         this.colorBorde = colorBorde;
+        
         setOpaque(false);
         setHorizontalAlignment(CENTER);
+        
+        // Cursor de mano para indicar que es clickeable
+        setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // --- Evento de Click ---
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                // Al hacer click, abrimos la ventana de detalles
+                if (procesoAsociado != null) {
+                    VentanaInfoProceso detalles = new VentanaInfoProceso(procesoAsociado);
+                    detalles.setVisible(true);
+                }
+            }
+        });
     }
-    
-    // Constructor vacío requerido por NetBeans (JavaBeans)
+
+    // Constructor vacío (si lo requiere Netbeans)
     public LabelRedondo() {
-        super("Texto"); // Texto por defecto
-        this.colorBorde = Color.BLACK; // Color por defecto
-        setOpaque(false);
-        setHorizontalAlignment(CENTER);
+        super("?");
+        this.colorBorde = Color.GRAY;
     }
 
     @Override
     protected void paintComponent(Graphics g) {
+        // ... (Tu código de dibujo existente se queda igual) ...
         Graphics2D g2 = (Graphics2D) g;
-        
-        // Suavizar bordes (Antialiasing) para que no se vea pixelado
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // 1. Pintar el Fondo
         g2.setColor(getBackground());
         g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, radio, radio);
-
-        // 2. Pintar el Texto (Llama al método original)
-        super.paintComponent(g);
-        
-        // 3. Pintar el Borde
         g2.setColor(colorBorde);
-        g2.setStroke(new BasicStroke(grosorBorde));
+        g2.setStroke(new BasicStroke(2));
         g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, radio, radio);
+        super.paintComponent(g);
     }
 }
