@@ -17,18 +17,22 @@ package Simulacion;
 public class Config {
     
     // Memoria
-    public static final int MEMORIA_TOTAL = 1024; // MB o Bloques
+    public static final int MEMORIA_TOTAL = 170; // MB o Bloques
     public static final int MEMORIA_RESERVADA_SO = 128; 
     
     // Planificación
     public static final int QUANTUM_DEFAULT = 5; // Ciclos para Round Robin
     
     // Tiempos
-    public static int VELOCIDAD_RELOJ = 1000; // ms por ciclo (Default 1s)
+    public static int VELOCIDAD_RELOJ =200; // ms por ciclo (Default 1s)
     
     // Límites
     public static final int MAX_PROCESOS_SISTEMA = 5;
     
     // Paths (Para lectura de archivos)
     public static final String RUTA_ARCHIVO_PROCESOS = "procesos.csv";
+    
+    public static final double PROB_BLOQUEO = 0;
+    
+    public static int TAMANO_PROCESO = 32;
 }

@@ -17,12 +17,14 @@ import Modelo.Proceso;
 import Utilidades.GeneradorProcesos;
 
 
+
 public class Administrador {
     
     private static Administrador instancia;
     private Cola colaListos;
     private Cola colaListosPrioridad;
     private Cola colaBloqueados;
+    private Cola colaListosSuspendidos;
     private ListaSimple<Proceso> listaTodos;
     private String politicaActual = "FCFS";
     private int contadorQuantum = 0;
@@ -31,11 +33,13 @@ public class Administrador {
     private Proceso procesoEnEjecucion;
     private int memoriaUsada;
     private int procesosTerminados;
+    private int contadorProcesosManuales = 1;
     
     private Administrador() {
         this.colaListos = new Cola();
         this.colaListosPrioridad = new Cola(); 
         this.colaBloqueados = new Cola();
+        this.colaListosSuspendidos = new Cola();
         this.listaTodos = new ListaSimple<>();
         this.procesoEnEjecucion = null;
         this.memoriaUsada = 0;
@@ -75,7 +79,7 @@ public class Administrador {
         // ... (Tu código de revisar bloqueados y nuevos) ...
         revisarColaBloqueados();
         checkNuevosProcesos();
-
+            
         // 2. Despachador (Si CPU libre)
         if (procesoEnEjecucion == null) {
             despacharProceso();
@@ -83,6 +87,12 @@ public class Administrador {
 
         // 3. Ejecución y Control de Quantum
         if (procesoEnEjecucion != null) {
+            
+            if (Math.random() < Config.PROB_BLOQUEO) { 
+                bloquearProcesoActual();
+                return; // Importante: Si se bloquea, no ejecuta instrucción ni gasta Quantum en este ciclo
+            }
+            
             
             // --- IMPLEMENTACIÓN ROUND ROBIN ---
             if (politicaActual.equals("Round Robin")) {
@@ -124,7 +134,59 @@ public class Administrador {
         }
     }
 
-    // --- LÓGICA DE BLOQUEOS (NUEVA) ---
+   public void agregarProcesoManual(String nombre, int instrucciones, int prioridad, boolean esSistema, int periodo) {
+        
+        // Generación de ID (Ej: SYS-1 o USR-1)
+        String idPrefix = "PM" + this.contadorProcesosManuales;
+        String nuevoId = idPrefix + "-" + String.format("%03d", contadorProcesosManuales++);
+        
+        // Calculo de Deadline (Si es periódico, deadline = periodo, si no, un valor por defecto)
+        // Como el usuario no lo edita, asumimos esta regla de negocio básica.
+        int deadlineCalculado = (periodo > 0) ? periodo : instrucciones * 2; 
+
+        // Creación del objeto Proceso
+        Proceso nuevoProceso = new Proceso(
+            nuevoId, 
+            nombre, 
+            instrucciones, 
+            deadlineCalculado, 
+            prioridad, 
+            esSistema, 
+            periodo
+        );
+        
+        // --- LÓGICA DE ADMISIÓN (RAM vs DISCO) ---
+        
+        // Verificamos si cabe en la memoria (Usando la constante de Config)
+        if (memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
+            
+            // Si hay espacio -> A la cola de LISTOS (RAM)
+            nuevoProceso.setEstado(Estado.LISTO);
+            nuevoProceso.setTiempoLlegada(System.currentTimeMillis());
+            
+            colaListos.encolar(nuevoProceso);
+            memoriaUsada += Config.TAMANO_PROCESO;
+            
+            System.out.println("[CREACION MANUAL] " + nuevoId + " agregado a RAM (Listo).");
+            
+            // Actualizar GUI
+            Principal.getInstancia().actualizarColaListos(colaListos);
+            Principal.getInstancia().actualizarMemoria(memoriaUsada, Config.MEMORIA_TOTAL);
+            
+        } else {
+            
+            // No hay espacio -> A la cola de SUSPENDIDOS (Disco)
+            nuevoProceso.setEstado(Estado.LISTO_SUSPENDIDO);
+            nuevoProceso.setTiempoLlegada(System.currentTimeMillis());
+            
+            colaListosSuspendidos.encolar(nuevoProceso);
+            
+            System.out.println("[CREACION MANUAL] " + nuevoId + " enviado a SUSPENDIDOS (Memoria llena).");
+            
+            // Actualizar GUI
+            Principal.getInstancia().actualizarColaSuspendidos(colaListosSuspendidos);
+        }
+    }
 
     private void bloquearProcesoActual() {
         if (procesoEnEjecucion != null) {
@@ -180,27 +242,60 @@ public class Administrador {
     }
     
     private void checkNuevosProcesos() {
-        boolean huboCambios = false;
-        Nodo<Proceso> actual = listaTodos.cabeza;
+        boolean huboCambiosListos = false;
+        boolean huboCambiosSuspendidos = false;
         
+        Nodo<Proceso> actual = listaTodos.cabeza;
         while (actual != null) {
             Proceso p = actual.dato;
+            
+            // Solo procesamos si es NUEVO (aún no ha entrado al sistema)
             if (p.getEstado() == Estado.NUEVO) {
-                if (memoriaUsada + 64 <= Config.MEMORIA_TOTAL) {
+                
+                // Opción A: Hay espacio en RAM
+                if (memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
                     p.setEstado(Estado.LISTO);
                     p.setTiempoLlegada(System.currentTimeMillis());
                     colaListos.encolar(p);
-                    memoriaUsada += 64;
-                    huboCambios = true; // Marcamos que la cola cambió
-                    System.out.println("[ADMISION] " + p.getId() + " -> Ready.");
+                    memoriaUsada += Config.TAMANO_PROCESO;
+                    huboCambiosListos = true;
+                    System.out.println("[ADMISION RAM] " + p.getId() + " -> Ready.");
+                } 
+                // Opción B: Memoria llena -> A Suspendidos (Disco)
+                else {
+                    p.setEstado(Estado.LISTO_SUSPENDIDO);
+                    p.setTiempoLlegada(System.currentTimeMillis());
+                    colaListosSuspendidos.encolar(p);
+                    huboCambiosSuspendidos = true;
+                    System.out.println("[ADMISION SWAP] " + p.getId() + " -> Suspendido (Memoria llena).");
                 }
             }
             actual = actual.siguiente;
         }
+
+        if (huboCambiosListos) Principal.getInstancia().actualizarColaListos(colaListos);
+        if (huboCambiosSuspendidos) Principal.getInstancia().actualizarColaSuspendidos(colaListosSuspendidos); // [NUEVO]
         
-        // Si hubo cambios, refrescamos la GUI
-        if (huboCambios) {
+        // Actualizar barra de memoria
+        Principal.getInstancia().actualizarMemoria(memoriaUsada, Config.MEMORIA_TOTAL);
+    }
+    
+    private void intentarSwapIn() {
+        if (!colaListosSuspendidos.estaVacia() && memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
+            Proceso p = colaListosSuspendidos.desencolar();
+            p.setEstado(Estado.LISTO);
+            colaListos.encolar(p);
+            memoriaUsada += Config.TAMANO_PROCESO;
+            
+            System.out.println("[SWAP IN] " + p.getId() + " movido de Disco a RAM.");
+            
+            // Actualizar ambas colas en la GUI
+            Principal.getInstancia().actualizarColaSuspendidos(colaListosSuspendidos);
             Principal.getInstancia().actualizarColaListos(colaListos);
+            Principal.getInstancia().actualizarMemoria(memoriaUsada, Config.MEMORIA_TOTAL);
+            
+            // Si liberamos suficiente espacio, intenta traer a otro recursivamente (opcional)
+            // intentarSwapIn(); 
         }
     }
     
@@ -221,12 +316,16 @@ public class Administrador {
     private void terminarProceso(Proceso p) {
         p.setEstado(Estado.TERMINADO);
         this.procesoEnEjecucion = null;
-        this.memoriaUsada -= 64;
+        this.memoriaUsada -= Config.TAMANO_PROCESO;
         this.procesosTerminados++;
         
         // Actualizar GUI CPU (ponerla libre)
         Principal.getInstancia().actualizarCPU(null);
         System.out.println("[TERMINADO] " + p.getId());
+        
+        
+        intentarSwapIn();
+        
     }
     
    public void cambiarPolitica(String nuevaPolitica) {
