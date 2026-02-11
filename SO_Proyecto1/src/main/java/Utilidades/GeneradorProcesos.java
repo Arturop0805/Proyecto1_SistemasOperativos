@@ -66,6 +66,8 @@ public class GeneradorProcesos {
             prioridad = 31 + random.nextInt(69);
         }
         
+        int tamano_proceso = random.nextInt(63);
+        
         // Instrucciones entre 10 y 300
         int instrucciones = 10 + random.nextInt(291);
         

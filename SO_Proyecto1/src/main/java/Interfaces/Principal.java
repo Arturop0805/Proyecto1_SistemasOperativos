@@ -196,6 +196,8 @@ public class Principal extends JFrame {
         btnIniciar.setBackground(new Color(0, 100, 0));
         btnIniciar.setForeground(Color.WHITE);
         btnIniciar.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        JButton btnCrearProceso = new JButton("Nuevo Proceso");
+        btnCrearProceso.addActionListener(e -> mostrarVentanaCreacion());
         
         JButton btnPausar = new JButton("PAUSAR");
         
@@ -229,6 +231,7 @@ public class Principal extends JFrame {
         panelInferior.add(btnPausar);
         panelInferior.add(new JLabel("Planificador:"));
         panelInferior.add(comboPolitica);
+        panelInferior.add(btnCrearProceso);
         add(panelInferior, BorderLayout.SOUTH);
     }
     
@@ -240,8 +243,111 @@ public class Principal extends JFrame {
         return p;
     }
 
-    // --- MÉTODOS DE ACTUALIZACIÓN (Llamados por el Kernel) ---
+    private void mostrarVentanaCreacion() {
+        JDialog dialogo = new JDialog(this, "Crear Nuevo Proceso", true);
+        dialogo.setSize(350, 400);
+        dialogo.setLayout(new GridLayout(7, 2, 10, 10));
+        dialogo.setLocationRelativeTo(this);
 
+        // --- Componentes ---
+        JTextField txtNombre = new JTextField();
+        JSpinner spinInstrucciones = new JSpinner(new SpinnerNumberModel(10, 1, 500, 1));
+        JSpinner spinPrioridad = new JSpinner(new SpinnerNumberModel(1, 1, 99, 1)); // Min 1 (Mayor prio), Max 99
+        JCheckBox chkSistema = new JCheckBox("Es de Sistema");
+        JSpinner spinPeriodo = new JSpinner(new SpinnerNumberModel(0, 0, 1000, 1)); // 0 = Aperiodico
+        
+        // Labels
+        dialogo.add(new JLabel("  Nombre:"));
+        dialogo.add(txtNombre);
+        
+        dialogo.add(new JLabel("  Instrucciones:"));
+        dialogo.add(spinInstrucciones);
+        
+        dialogo.add(new JLabel("  Prioridad (1=Max):"));
+        dialogo.add(spinPrioridad);
+        
+        dialogo.add(new JLabel("  Tipo:"));
+        dialogo.add(chkSistema);
+        
+        dialogo.add(new JLabel("  Periodo (0=No):"));
+        dialogo.add(spinPeriodo);
+        
+        // Botón Guardar
+        JButton btnGuardar = new JButton("Crear");
+        btnGuardar.addActionListener(e -> {
+            // --- VALIDACIONES ---
+            String nombre = txtNombre.getText().trim();
+            if(nombre.isEmpty()) {
+                JOptionPane.showMessageDialog(dialogo, "El nombre no puede estar vacío.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // Los JSpinner ya limitan numéricamente, pero obtenemos los valores
+            int instrucciones = (int) spinInstrucciones.getValue();
+            int prioridad = (int) spinPrioridad.getValue();
+            boolean esSistema = chkSistema.isSelected();
+            int periodo = (int) spinPeriodo.getValue();
+            
+            // Validación extra de prioridad (por si acaso)
+            if(prioridad <= 0) {
+                 JOptionPane.showMessageDialog(dialogo, "La prioridad debe ser mayor a 0.", "Error", JOptionPane.ERROR_MESSAGE);
+                 return;
+            }
+
+            // --- LLAMADA AL NUCLEO ---
+            Administrador.getInstancia().agregarProcesoManual(nombre, instrucciones, prioridad, esSistema, periodo);
+            
+            dialogo.dispose(); // Cerrar ventana
+        });
+
+        // Botón Cancelar
+        JButton btnCancelar = new JButton("Cancelar");
+        btnCancelar.addActionListener(e -> dialogo.dispose());
+
+        dialogo.add(btnGuardar);
+        dialogo.add(btnCancelar);
+        dialogo.setVisible(true);
+    }
+    // --- MÉTODOS DE ACTUALIZACIÓN (Llamados por el Kernel/Administrador) ---
+
+    public void actualizarMemoria(int usada, int total) {
+        SwingUtilities.invokeLater(() -> {
+            barraMemoria.setValue(usada);
+            barraMemoria.setString(usada + " MB / " + total + " MB");
+            
+            if (usada > total * 0.9) {
+                barraMemoria.setForeground(Color.RED); // Alerta visual
+            } else {
+                barraMemoria.setForeground(new Color(100, 149, 237));
+            }
+        });
+    }
+    
+    public void actualizarColaSuspendidos(Cola cola) {
+        SwingUtilities.invokeLater(() -> {
+            panelColaSuspendidos.removeAll();
+            
+            if (!cola.estaVacia()) {
+                Nodo<Proceso> actual = cola.getFrente();
+                while (actual != null) {
+                    Proceso p = actual.dato;
+                    
+                    // Usamos color gris para indicar que está en disco/suspendido
+                    LabelRedondo lbl = new LabelRedondo(p, Color.GRAY); 
+                    lbl.setText(p.getId() + " (Swap)");
+                    lbl.setToolTipText("Esperando memoria RAM...");
+                    lbl.setPreferredSize(new Dimension(70, 60));
+                    
+                    panelColaSuspendidos.add(lbl);
+                    actual = actual.siguiente;
+                }
+            }
+            
+            panelColaSuspendidos.revalidate();
+            panelColaSuspendidos.repaint();
+        });
+    }
+    
     public void actualizarReloj(int ciclo) {
         // SwingUtilities asegura que esto corra en el hilo de la interfaz para no congelarla
         SwingUtilities.invokeLater(() -> {

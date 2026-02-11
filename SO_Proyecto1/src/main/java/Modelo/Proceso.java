@@ -20,7 +20,8 @@ public class Proceso {
     private String nombre;
     private int totalInstrucciones;
     private int prioridadInicial;
-    private int deadline;            
+    private int deadline;  
+    private int tamano_proceso;
 
     private boolean esDeSistema;     // true = SO, false = Usuario
     private int periodo; 
@@ -44,6 +45,7 @@ public class Proceso {
         this.prioridadInicial = prioridad;
         this.esDeSistema = esSistema;
         this.periodo = periodo;
+        
         
         // Inicialización de registros
         this.pc = 0;
@@ -97,8 +99,7 @@ public class Proceso {
     public Integer getMAR(){return this.mar;}
     
     public void setTiempoLlegada(long t) { this.tiempoLlegada = t; }
-    public long getTiempoLlegada() { return tiempoLlegada; }
-
+    public long getTiempoLlegada() { return tiempoLlegada; }       
     public String getId() { return id; }
     public String getNombre() { return nombre; }
     public int getPrioridad() { return prioridadInicial; }
