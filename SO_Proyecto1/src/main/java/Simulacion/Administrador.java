@@ -30,6 +30,12 @@ public class Administrador {
     private int contadorQuantum = 0;
     private int relojDelSistema = 0;
     
+    // --- VARIABLES PARA ESTADÍSTICAS ---
+    private int totalProcesosTerminados = 0;
+    private int totalProcesosCumplenDeadline = 0;
+    private int sumaTiempoRespuesta = 0; // Suma de (t_primera_ejec - t_llegada)
+    private int sumaTiempoBloqueado = 0; // Suma de tiempo bloqueado de procesos terminados
+    
     private Proceso procesoEnEjecucion;
     private int memoriaUsada;
     private int procesosTerminados;
@@ -69,7 +75,11 @@ public class Administrador {
     }
     
     public void ejecutarCiclo(int cicloActual) {
+        // Verificar si hay alguien en CPU para mandar 100 o 0
+        boolean cpuOcupado = (procesoEnEjecucion != null);
         
+        // Llamar a Principal (usando tu Singleton o referencia estática)
+        Principal.getInstancia().actualizarGraficaCPU(cpuOcupado);
         this.relojDelSistema++; // El Kernel avanza su propio reloj
         
         // Actualizamos la Vista con NUESTRO reloj interno, no el externo
@@ -155,6 +165,7 @@ public class Administrador {
             periodo
         );
         
+        nuevoProceso.setTiempoLlegada(this.relojDelSistema);
         // --- LÓGICA DE ADMISIÓN (RAM vs DISCO) ---
         
         // Verificamos si cabe en la memoria (Usando la constante de Config)
@@ -162,7 +173,7 @@ public class Administrador {
             
             // Si hay espacio -> A la cola de LISTOS (RAM)
             nuevoProceso.setEstado(Estado.LISTO);
-            nuevoProceso.setTiempoLlegada(System.currentTimeMillis());
+            nuevoProceso.setTiempoLlegada(this.relojDelSistema);
             
             colaListos.encolar(nuevoProceso);
             memoriaUsada += Config.TAMANO_PROCESO;
@@ -177,7 +188,7 @@ public class Administrador {
             
             // No hay espacio -> A la cola de SUSPENDIDOS (Disco)
             nuevoProceso.setEstado(Estado.LISTO_SUSPENDIDO);
-            nuevoProceso.setTiempoLlegada(System.currentTimeMillis());
+            nuevoProceso.setTiempoLlegada(this.relojDelSistema);
             
             colaListosSuspendidos.encolar(nuevoProceso);
             
@@ -197,6 +208,7 @@ public class Administrador {
             System.out.println("[I/O INTERRUPT] " + procesoEnEjecucion.getId() + " bloqueado por " + tiempoBloqueo + " ciclos.");
             
             // Mover a cola de bloqueados
+           
             colaBloqueados.encolar(procesoEnEjecucion);
             procesoEnEjecucion = null; // CPU Libre
             
@@ -219,7 +231,7 @@ public class Administrador {
         
         for (int i = 0; i < tamañoOriginal; i++) {
             Proceso p = colaBloqueados.desencolar();
-            
+            p.agregarTiempoBloqueado();
             boolean terminoEspera = p.reducirTiempoBloqueo();
             
             if (terminoEspera) {
@@ -251,11 +263,11 @@ public class Administrador {
             
             // Solo procesamos si es NUEVO (aún no ha entrado al sistema)
             if (p.getEstado() == Estado.NUEVO) {
-                
+                p.setTiempoLlegada(this.relojDelSistema);
                 // Opción A: Hay espacio en RAM
                 if (memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
                     p.setEstado(Estado.LISTO);
-                    p.setTiempoLlegada(System.currentTimeMillis());
+                    p.setTiempoLlegada(this.relojDelSistema);
                     colaListos.encolar(p);
                     memoriaUsada += Config.TAMANO_PROCESO;
                     huboCambiosListos = true;
@@ -264,7 +276,7 @@ public class Administrador {
                 // Opción B: Memoria llena -> A Suspendidos (Disco)
                 else {
                     p.setEstado(Estado.LISTO_SUSPENDIDO);
-                    p.setTiempoLlegada(System.currentTimeMillis());
+                    p.setTiempoLlegada(this.relojDelSistema);
                     colaListosSuspendidos.encolar(p);
                     huboCambiosSuspendidos = true;
                     System.out.println("[ADMISION SWAP] " + p.getId() + " -> Suspendido (Memoria llena).");
@@ -303,6 +315,26 @@ public class Administrador {
         if (!colaListos.estaVacia()) {
             Proceso p = colaListos.desencolar();
             p.setEstado(Estado.EJECUCION);
+            
+            // --- CORRECCIÓN MÉTRICA TIEMPO RESPUESTA ---
+            if (p.getTiempoPrimeraEjecucion() == -1) {
+                // 1. Marcar el ciclo actual como primera ejecución
+                p.setTiempoPrimeraEjecucion(this.relojDelSistema);
+                
+                // 2. Obtener llegada (Asegurándonos que sea el ciclo, ej: 0, 5, 10)
+                int llegada = p.getTiempoLlegadaInt(); 
+                
+                // 3. Calcular respuesta: Ciclo Actual (ej: 50) - Llegada (ej: 0) = 50
+                int respuesta = this.relojDelSistema - llegada;
+                
+                // 4. Protección contra números negativos o absurdos
+                //if (respuesta < 0) respuesta = 0; 
+                
+                this.sumaTiempoRespuesta += respuesta;
+                
+                // Debug (Opcional): Si sale un número raro, esto te lo dirá en consola
+                // System.out.println("Proceso " + p.getId() + " Respuesta: " + respuesta + " (Reloj: " + this.relojDelSistema + " - Llegada: " + llegada + ")");
+            }
             this.procesoEnEjecucion = p;
             
             // Actualizar GUI: Quitamos de la cola y ponemos en CPU
@@ -311,21 +343,38 @@ public class Administrador {
             
             System.out.println("[DISPATCH] " + p.getId() + " entra a CPU.");
         }
+        
+       
+
     }
     
     private void terminarProceso(Proceso p) {
         p.setEstado(Estado.TERMINADO);
+        p.setTiempoFinalizacion(this.relojDelSistema); // Marcar hora fin
+
         this.procesoEnEjecucion = null;
         this.memoriaUsada -= Config.TAMANO_PROCESO;
-        this.procesosTerminados++;
         
+        // --- NUEVO: Lógica de Estadísticas ---
+        this.procesosTerminados++;
+        this.totalProcesosTerminados++;
+        
+        // 1. Verificar Deadline (Tiempo Retorno <= Deadline)
+        // Tiempo Retorno = (Fin - Llegada)
+        int tiempoRetorno = p.getTiempoFinalizacion() - (int)p.getTiempoLlegada();
+        if (tiempoRetorno <= p.getDeadline()) {
+            this.totalProcesosCumplenDeadline++;
+        }
+        
+        // 2. Acumular tiempo bloqueado global
+        this.sumaTiempoBloqueado += p.getTiempoTotalBloqueado();
+        // -------------------------------------
+
         // Actualizar GUI CPU (ponerla libre)
         Principal.getInstancia().actualizarCPU(null);
         System.out.println("[TERMINADO] " + p.getId());
-        
-        
+
         intentarSwapIn();
-        
     }
     
    public void cambiarPolitica(String nuevaPolitica) {
@@ -463,5 +512,31 @@ public class Administrador {
             reordenarColaListos(); // Reordenar para que el expulsado se ubique bien
             despacharProceso();    // Meter al nuevo
         }
+    }
+    
+    public int getRelojSistema() {return this.relojDelSistema;}
+    
+    // --- MÉTODO DE REPORTE ---
+    public String obtenerReporteEstadisticas() {
+        
+
+        double porcentajeDeadline = ((double) totalProcesosCumplenDeadline / totalProcesosTerminados) * 100;
+        double promedioRespuesta = (double) sumaTiempoRespuesta / totalProcesosTerminados;
+        // Nota: El promedio de bloqueo se suele calcular sobre el total de procesos terminados
+        // o solo sobre los que se bloquearon. Aquí usaremos el total terminados para ver el impacto global.
+        double promedioBloqueo = (double) sumaTiempoBloqueado / totalProcesosTerminados;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== REPORTE DE RENDIMIENTO ===\n");
+        sb.append("Procesos Terminados: ").append(totalProcesosTerminados).append("\n");
+        sb.append("----------------------------\n");
+        sb.append(String.format("1. Cumplimiento de Deadline: %.2f%%\n", porcentajeDeadline));
+        sb.append("   (Procesos que finalizaron a tiempo)\n\n");
+        sb.append(String.format("2. Tiempo Promedio de Respuesta: %.2f ciclos\n", promedioRespuesta));
+        sb.append("   (Tiempo desde llegada hasta primera ejecución)\n\n");
+        sb.append(String.format("3. Tiempo Promedio Bloqueado: %.2f ciclos\n", promedioBloqueo));
+        sb.append("   (Tiempo promedio en estado I/O wait)\n");
+        
+        return sb.toString();
     }
 }

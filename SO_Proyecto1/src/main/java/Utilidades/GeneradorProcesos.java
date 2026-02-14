@@ -11,8 +11,8 @@ package Utilidades;
 import EstructurasDeDatos.ListaSimple;
 import Modelo.Estado;
 import Modelo.Proceso;
-import Simulacion.Config;
 import java.util.Random;
+import Simulacion.Administrador;
 
 /**
  * Clase auxiliar para crear procesos de prueba.
@@ -84,7 +84,7 @@ public class GeneradorProcesos {
         
         // Asignamos un estado inicial correcto
         p.setEstado(Estado.NUEVO);
-        
+        p.setTiempoLlegada(Administrador.getInstancia().getRelojSistema());
         return p;
     }
     

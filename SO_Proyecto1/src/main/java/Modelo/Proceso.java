@@ -5,14 +5,7 @@ import Modelo.PCB;
  * @author tomas
  */
 
-/**
- * El Proceso actúa como su propio PCB.
- * Contiene identificadores, estado y contadores de ejecución.
- */
-/**
- * El Proceso actúa como su propio PCB.
- * Contiene identificadores, estado y contadores de ejecución.
- */
+
 public class Proceso {
     
     // Datos Estáticos
@@ -36,6 +29,12 @@ public class Proceso {
     private Estado estado;               
     private int ciclosBloqueadoRestantes;
     private long tiempoLlegada;          // <--- Variable necesaria para el error
+    
+    // --- NUEVAS VARIABLES PARA ESTADÍSTICAS ---
+    private int tiempoPrimeraEjecucion = -1; // -1 indica que nunca se ha ejecutado
+    private int tiempoTotalBloqueado = 0;
+    private int tiempoFinalizacion = 0;
+    
 
     public Proceso(String id, String nombre, int totalInstrucciones, int deadline, int prioridad, boolean esSistema, int periodo) {
         this.id = id;
@@ -52,6 +51,8 @@ public class Proceso {
         this.mar = 0;
         this.estado = Estado.NUEVO;
         this.ciclosBloqueadoRestantes = 0;
+        
+        
     }
     
 
@@ -97,9 +98,13 @@ public class Proceso {
     
     public Integer getTotalInstrucciones(){return this.totalInstrucciones;}
     public Integer getMAR(){return this.mar;}
-    
-    public void setTiempoLlegada(long t) { this.tiempoLlegada = t; }
-    public long getTiempoLlegada() { return tiempoLlegada; }       
+    public void setTiempoLlegada(long t) { 
+        this.tiempoLlegada = t; 
+    }
+    public long getTiempoLlegada() { return this.tiempoLlegada;}  
+    public int getTiempoLlegadaInt() {
+        return (int) this.tiempoLlegada;
+    }
     public String getId() { return id; }
     public String getNombre() { return nombre; }
     public int getPrioridad() { return prioridadInicial; }
@@ -109,7 +114,24 @@ public class Proceso {
     public int getPC() { return pc; }
     public int getInstruccionesRestantes() { return totalInstrucciones - pc; }
     public boolean esDeSistema() { return esDeSistema; }
+    // --- MÉTODOS PARA MÉTRICAS ---
+    public void setTiempoPrimeraEjecucion(int tiempo) {
+        if (this.tiempoPrimeraEjecucion == -1) { // Solo guardamos la primera vez
+            this.tiempoPrimeraEjecucion = tiempo;
+        }
+    }
     
+    public int getTiempoPrimeraEjecucion() { return tiempoPrimeraEjecucion; }
+    
+    public void agregarTiempoBloqueado() {
+        this.tiempoTotalBloqueado++;
+    }
+    
+    public int getTiempoTotalBloqueado() { return tiempoTotalBloqueado; }
+    
+    public void setTiempoFinalizacion(int tiempo) { this.tiempoFinalizacion = tiempo; }
+    public int getTiempoFinalizacion() { return tiempoFinalizacion; }
+
     @Override
     public String toString() {
         return id + " | " + nombre + " (" + estado + ")";

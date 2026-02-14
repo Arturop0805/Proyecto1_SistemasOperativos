@@ -14,6 +14,7 @@ import EstructurasDeDatos.Nodo;
 import Modelo.Proceso;
 import Simulacion.Administrador;
 import Simulacion.Reloj;
+import Simulacion.Config;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -43,6 +44,7 @@ public class Principal extends JFrame {
     private JPanel panelColaListos;
     private JPanel panelColaBloqueados;
     private JPanel panelColaSuspendidos; // Swap
+    private PanelGraficaCPU panelGrafica;
 
     public Principal() {
         configurarVentana();
@@ -111,12 +113,20 @@ public class Principal extends JFrame {
         barraProgresoCPU = new JProgressBar(0, 100);
         barraProgresoCPU.setStringPainted(true);
         barraProgresoCPU.setString("CPU Libre");
+        
+        panelGrafica = new PanelGraficaCPU();
+        panelGrafica.setPreferredSize(new Dimension(200, 80)); // Tamaño fijo para la gráfica
+        panelGrafica.setBorder(BorderFactory.createLineBorder(Color.GRAY));
 
         // 3. Agregamos al panel
         panelInfoCPU.add(new JLabel("ID Proceso:"));
         panelInfoCPU.add(lblCpuId);
         panelInfoCPU.add(lblCpuNombre);
         panelInfoCPU.add(barraProgresoCPU);
+        panelInfoCPU.add(Box.createVerticalStrut(10)); // Espacio
+        panelInfoCPU.add(panelGrafica);
+        
+        
 
         // 4. --- LÓGICA DEL CLICK (NUEVO) ---
         // Creamos el oyente (Listener) para detectar el click
@@ -207,7 +217,7 @@ public class Principal extends JFrame {
         btnIniciar.addActionListener((ActionEvent e) -> {
             System.out.println(">>> Iniciando desde GUI...");
             // Lógica para conectar con el backend
-            Administrador.getInstancia().iniciarSimulacion(5); // Cargar 5 iniciales
+            Administrador.getInstancia().iniciarSimulacion(Config.NUM_PROCESOS_INICIALES); // Cargar 5 iniciales
             Reloj.getInstancia().start();
             btnIniciar.setEnabled(false);
         });
@@ -226,6 +236,17 @@ public class Principal extends JFrame {
             }
         });
 
+                JButton btnReporte = new JButton("Estadísticas");
+        btnReporte.setBackground(new Color(70, 130, 180));
+        btnReporte.setForeground(Color.WHITE);
+        
+        btnReporte.addActionListener(e -> {
+            String reporte = Administrador.getInstancia().obtenerReporteEstadisticas();
+            JOptionPane.showMessageDialog(this, reporte, "Métricas del Sistema", JOptionPane.INFORMATION_MESSAGE);
+        });
+            
+        
+        
         panelInferior.add(btnCargar);
         panelInferior.add(btnIniciar);
         panelInferior.add(btnPausar);
@@ -233,6 +254,12 @@ public class Principal extends JFrame {
         panelInferior.add(comboPolitica);
         panelInferior.add(btnCrearProceso);
         add(panelInferior, BorderLayout.SOUTH);
+        panelInferior.add(btnReporte);
+        
+
+
+// Agrega btnReporte a tu panel de control o barra de herramientas
+
     }
     
     private JPanel crearPanelColumna(String titulo) {
@@ -445,6 +472,12 @@ public class Principal extends JFrame {
         });
     }
     
+    public void actualizarGraficaCPU(boolean ocupado) {
+        SwingUtilities.invokeLater(() -> {
+            // Si está ocupado 100%, si no 0%
+            panelGrafica.agregarDato(ocupado ? 100 : 0);
+        });
+    }
     // Método Main para probar la interfaz SOLA (Test de Fuego Visual)
     public static void main(String[] args) {
         try {
@@ -459,4 +492,6 @@ public class Principal extends JFrame {
             e.printStackTrace();
         }
     }
+    
+    
 }
