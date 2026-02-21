@@ -17,7 +17,7 @@ package Simulacion;
 public class Config {
     
     // Memoria
-    public static final int MEMORIA_TOTAL = 1024; // MB o Bloques
+    public static final int MEMORIA_TOTAL = 256; // MB o Bloques
     public static final int MEMORIA_RESERVADA_SO = 128; 
     
     // Planificación
@@ -34,7 +34,7 @@ public class Config {
     
     public static final double PROB_BLOQUEO = 0.5;
     
-    public static int TAMANO_PROCESO = 64;
+    public static int TAMANO_PROCESO = 32;
     
     public static int NUM_PROCESOS_INICIALES = 10;
 }

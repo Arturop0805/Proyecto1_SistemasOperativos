@@ -77,9 +77,8 @@ public class GeneradorProcesos {
         int cicloExcepcion = 1 + random.nextInt(instrucciones); // Se bloquea en algún momento de su vida
         int ciclosResolver = 3 + random.nextInt(8); // Tarda entre 3 y 10 ciclos en resolverse el E/S
         
-        // --- NUEVO REQUERIMIENTO: MEMORIA ---
-        // Generar Memoria Requerida (entre 16MB y 256MB)
-        int memoriaRequerida = 16 + random.nextInt(241); 
+        
+        int memoriaRequerida = Config.TAMANO_PROCESO;
         
         // Creación del proceso (Asegúrate de que el constructor de Proceso reciba "memoriaRequerida")
         Proceso p = new Proceso(id, nombre, instrucciones, deadline, prioridad, esSistema, periodo, cicloExcepcion, ciclosResolver, memoriaRequerida);

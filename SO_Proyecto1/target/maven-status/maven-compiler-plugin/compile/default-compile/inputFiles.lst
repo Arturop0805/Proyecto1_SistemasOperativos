@@ -1,15 +1,15 @@
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\com\mycompany\so_proyecto1\SO_Proyecto1.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\ComponentesVisuales\LabelRedondo.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\EstructurasDeDatos\Cola.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\EstructurasDeDatos\ListaSimple.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\EstructurasDeDatos\Nodo.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Interfaces\PanelGraficaCPU.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Interfaces\Principal.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Interfaces\VentanaInfoProceso.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Modelo\Estado.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Modelo\Proceso.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Simulacion\Administrador.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Simulacion\Config.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Simulacion\HiloInterrupcion.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Simulacion\Reloj.java
-C:\Users\Artur\Downloads\Proyecto1_SistemasOperativos-main (6)\Proyecto1_SistemasOperativos-main (4)\Proyecto1_SistemasOperativos-main\SO_Proyecto1\src\main\java\Utilidades\GeneradorProcesos.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\com\mycompany\so_proyecto1\SO_Proyecto1.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\ComponentesVisuales\LabelRedondo.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\EstructurasDeDatos\Cola.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\EstructurasDeDatos\ListaSimple.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\EstructurasDeDatos\Nodo.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Interfaces\PanelGraficaCPU.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Interfaces\Principal.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Interfaces\VentanaInfoProceso.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Modelo\Estado.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Modelo\Proceso.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Simulacion\Administrador.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Simulacion\Config.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Simulacion\HiloInterrupcion.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Simulacion\Reloj.java
+C:\Users\Artur\OneDrive\Escritorio\Miscelaneos\Proyecto1_SistemasOperativos\SO_Proyecto1\src\main\java\Utilidades\GeneradorProcesos.java
