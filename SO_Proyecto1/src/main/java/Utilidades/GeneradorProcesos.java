@@ -11,8 +11,8 @@ package Utilidades;
 import EstructurasDeDatos.ListaSimple;
 import Modelo.Estado;
 import Modelo.Proceso;
+import Simulacion.Config;
 import java.util.Random;
-import Simulacion.Administrador;
 
 /**
  * Clase auxiliar para crear procesos de prueba.
@@ -36,21 +36,17 @@ public class GeneradorProcesos {
 
     /**
      * Genera una lista de procesos aleatorios listos para la simulación.
-     * @param cantidad Número de procesos a crear (ej: 20)
-     * @return ListaSimple con los procesos
      */
     public static ListaSimple<Proceso> generarAleatorios(int cantidad) {
         ListaSimple<Proceso> lista = new ListaSimple<>();
-        
         for (int i = 0; i < cantidad; i++) {
             lista.agregarFinal(crearProcesoAleatorio());
         }
-        
         return lista;
     }
     
     public static Proceso crearProcesoAleatorio() {
-        boolean esSistema = random.nextDouble() < 0.3; // 30% probabilidad de ser SO
+        boolean esSistema = random.nextDouble() < 0.3; // 30% prob de ser SO
         
         String id = "P" + String.format("%03d", contadorIds++);
         String nombre;
@@ -58,15 +54,11 @@ public class GeneradorProcesos {
         
         if (esSistema) {
             nombre = NOMBRES_SISTEMA[random.nextInt(NOMBRES_SISTEMA.length)];
-            // Prioridad Alta para Sistema (1-30)
             prioridad = 1 + random.nextInt(30); 
         } else {
             nombre = NOMBRES_USUARIO[random.nextInt(NOMBRES_USUARIO.length)];
-            // Prioridad Media/Baja para Usuario (31-99)
             prioridad = 31 + random.nextInt(69);
         }
-        
-        int tamano_proceso = random.nextInt(63);
         
         // Instrucciones entre 10 y 300
         int instrucciones = 10 + random.nextInt(291);
@@ -74,23 +66,28 @@ public class GeneradorProcesos {
         // Deadline basado en instrucciones (Holgura aleatoria)
         int deadline = instrucciones + random.nextInt(500);
         
-        // Periodo (0 para aperiodicos, valor > 0 para periódicos)
+        // Periodo
         int periodo = 0;
-        if (random.nextDouble() < 0.2) { // 20% son periódicos
+        if (random.nextDouble() < 0.2) { 
             periodo = deadline + random.nextInt(200);
         }
         
-        Proceso p = new Proceso(id, nombre, instrucciones, deadline, prioridad, esSistema, periodo);
+        // --- REQUERIMIENTO DE E/S ---
+        // Generar en qué ciclo de su ejecución pedirá E/S y cuánto tardará
+        int cicloExcepcion = 1 + random.nextInt(instrucciones); // Se bloquea en algún momento de su vida
+        int ciclosResolver = 3 + random.nextInt(8); // Tarda entre 3 y 10 ciclos en resolverse el E/S
         
-        // Asignamos un estado inicial correcto
+        // --- NUEVO REQUERIMIENTO: MEMORIA ---
+        // Generar Memoria Requerida (entre 16MB y 256MB)
+        int memoriaRequerida = 16 + random.nextInt(241); 
+        
+        // Creación del proceso (Asegúrate de que el constructor de Proceso reciba "memoriaRequerida")
+        Proceso p = new Proceso(id, nombre, instrucciones, deadline, prioridad, esSistema, periodo, cicloExcepcion, ciclosResolver, memoriaRequerida);
+        
         p.setEstado(Estado.NUEVO);
-        p.setTiempoLlegada(Administrador.getInstancia().getRelojSistema());
         return p;
     }
     
-    /**
-     * Reinicia el contador de IDs (útil para reiniciar simulación)
-     */
     public static void reiniciarContador() {
         contadorIds = 1;
     }

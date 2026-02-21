@@ -8,522 +8,496 @@ package Simulacion;
  *
  * @author tomas
  */
+
+
 import EstructurasDeDatos.Cola;
 import EstructurasDeDatos.ListaSimple;
 import EstructurasDeDatos.Nodo;
-import Interfaces.Principal; // Importante
 import Modelo.Estado;
 import Modelo.Proceso;
 import Utilidades.GeneradorProcesos;
+import java.util.concurrent.Semaphore;
 
-
-
+/**
+ * Kernel del Sistema Operativo.
+ * Controla el ciclo de vida de los procesos, las colas y el dispatcher.
+ */
 public class Administrador {
     
+    // Singleton
     private static Administrador instancia;
+    
+    // Estructuras de Datos
     private Cola colaListos;
-    private Cola colaListosPrioridad;
+    private Cola colaListosPrioridad; // Para SRT y Prioridades a futuro
     private Cola colaBloqueados;
-    private Cola colaListosSuspendidos;
-    private ListaSimple<Proceso> listaTodos;
+    private Cola colaListosSuspendidos; // Swap de Memoria
+    private Cola colaBloqueadosSuspendidos; // NUEVO: Soluciona el error en Principal
+    private ListaSimple<Proceso> listaTodos; // Historial y procesos por llegar
+    
+    // SEMÁFORO NUEVO: Protege las colas para que el Reloj y el Hilo de E/S no choquen
+    private Semaphore mutexColas = new Semaphore(1);
+    
+    // Variables de Estado
     private String politicaActual = "FCFS";
     private int contadorQuantum = 0;
     private int relojDelSistema = 0;
+    private Proceso procesoEnEjecucion;
     
-    // --- VARIABLES PARA ESTADÍSTICAS ---
+    // NUEVO: Variable dinámica para el Quantum
+    private int quantumActual = Config.QUANTUM_DEFAULT;
+    
+    // NUEVO: Variables de Memoria RAM
+    private int memoriaRAMDisponible;
+    
+    // Variable para conectar con la GUI
+    private Runnable actualizadorVisual;
+    
+    // Variables para Estadísticas
     private int totalProcesosTerminados = 0;
     private int totalProcesosCumplenDeadline = 0;
-    private int sumaTiempoRespuesta = 0; // Suma de (t_primera_ejec - t_llegada)
-    private int sumaTiempoBloqueado = 0; // Suma de tiempo bloqueado de procesos terminados
-    
-    private Proceso procesoEnEjecucion;
-    private int memoriaUsada;
-    private int procesosTerminados;
-    private int contadorProcesosManuales = 1;
-    
+    private int sumaTiempoRespuesta = 0;
+    private int sumaTiempoBloqueado = 0;
+
+    // Constructor privado (Singleton)
     private Administrador() {
         this.colaListos = new Cola();
-        this.colaListosPrioridad = new Cola(); 
+        this.colaListosPrioridad = new Cola();
         this.colaBloqueados = new Cola();
         this.colaListosSuspendidos = new Cola();
+        this.colaBloqueadosSuspendidos = new Cola(); // INICIALIZADO
         this.listaTodos = new ListaSimple<>();
-        this.procesoEnEjecucion = null;
-        this.memoriaUsada = 0;
-        this.procesosTerminados = 0;
+        
+        // Inicializar Memoria Disponible descontando la del SO
+        this.memoriaRAMDisponible = Config.MEMORIA_TOTAL - Config.MEMORIA_RESERVADA_SO;
     }
     
-    
-    
-    
+    // Método para obtener la única instancia del Administrador
     public static Administrador getInstancia() {
         if (instancia == null) {
             instancia = new Administrador();
         }
         return instancia;
     }
+
+    /**
+     * Método llamado desde Principal para arrancar la simulación
+     * con una cantidad específica de procesos iniciales.
+     */
+    public void iniciarSimulacion(int numProcesos) {
+        System.out.println("[KERNEL] Iniciando simulación con " + numProcesos + " procesos.");
+        for (int i = 0; i < numProcesos; i++) {
+            ListaSimple<Proceso> generados = GeneradorProcesos.generarAleatorios(1);
+            if (generados.cabeza != null) {
+                Proceso p = generados.cabeza.dato;
+                p.setTiempoLlegada(i * 2); 
+                listaTodos.agregarFinal(p);
+            }
+        }
+    }
     
-    public void iniciarSimulacion(int cantidadProcesos) {
-        System.out.println("[KERNEL] Inicializando simulación...");
-        this.listaTodos = GeneradorProcesos.generarAleatorios(cantidadProcesos);
-        this.memoriaUsada = 0;
-        this.procesoEnEjecucion = null;
-        this.procesosTerminados = 0;
-        
-        // Limpiar interfaz
-        Principal.getInstancia().actualizarColaListos(colaListos);
-        Principal.getInstancia().actualizarCPU(null);
-    }
-    
-    public void ejecutarCiclo(int cicloActual) {
-        // Verificar si hay alguien en CPU para mandar 100 o 0
-        boolean cpuOcupado = (procesoEnEjecucion != null);
-        
-        // Llamar a Principal (usando tu Singleton o referencia estática)
-        Principal.getInstancia().actualizarGraficaCPU(cpuOcupado);
-        this.relojDelSistema++; // El Kernel avanza su propio reloj
-        
-        // Actualizamos la Vista con NUESTRO reloj interno, no el externo
-        Principal.getInstancia().actualizarReloj(this.relojDelSistema);
-        
-        // 1. Gestión del Reloj y Procesos (Igual que antes)
-        // ... (Tu código de revisar bloqueados y nuevos) ...
-        revisarColaBloqueados();
-        checkNuevosProcesos();
+    // --- NUEVO MÉTODO: Admitir proceso directo desde la Interfaz (Botones Crear) ---
+    public void admitirProceso(Proceso p) {
+        try {
+            mutexColas.acquire();
+            p.setTiempoLlegada(relojDelSistema);
+            listaTodos.agregarFinal(p);
             
-        // 2. Despachador (Si CPU libre)
-        if (procesoEnEjecucion == null) {
-            despacharProceso();
-        }
-
-        // 3. Ejecución y Control de Quantum
-        if (procesoEnEjecucion != null) {
-            
-            if (Math.random() < Config.PROB_BLOQUEO) { 
-                bloquearProcesoActual();
-                return; // Importante: Si se bloquea, no ejecuta instrucción ni gasta Quantum en este ciclo
-            }
-            
-            
-            // --- IMPLEMENTACIÓN ROUND ROBIN ---
-            if (politicaActual.equals("Round Robin")) {
-                contadorQuantum++; // Incrementamos el uso de CPU
-                
-                // Verificamos contra la configuración global
-                if (contadorQuantum >= Config.QUANTUM_DEFAULT) {
-                    System.out.println("[RR QUANTUM] " + procesoEnEjecucion.getId() + " agotó su tiempo.");
-                    
-                    // Context Switch: Expulsión
-                    procesoEnEjecucion.setEstado(Estado.LISTO);
-                    colaListos.encolar(procesoEnEjecucion); // Va al final de la cola
-                    
-                    // Actualizar interfaz
-                    Principal.getInstancia().actualizarCPU(null);
-                    Principal.getInstancia().actualizarColaListos(colaListos);
-                    
-                    procesoEnEjecucion = null;
-                    contadorQuantum = 0; // Reseteamos contador
-                    
-                    // Intentamos meter al siguiente inmediatamente
-                    despacharProceso();
-                }
-            }
-            // ----------------------------------
-
-            // Ejecución normal de la instrucción (si aún sigue en CPU tras el chequeo RR)
-            if (procesoEnEjecucion != null) {
-                // ... (Tu código de bloqueo aleatorio y ejecución) ...
-                
-                boolean termino = procesoEnEjecucion.ejecutarInstruccion();
-                Principal.getInstancia().actualizarCPU(procesoEnEjecucion);
-
-                if (termino) {
-                    terminarProceso(procesoEnEjecucion);
-                    contadorQuantum = 0; // Importante: Resetear al terminar
-                }
-            }
-        }
-    }
-
-   public void agregarProcesoManual(String nombre, int instrucciones, int prioridad, boolean esSistema, int periodo) {
-        
-        // Generación de ID (Ej: SYS-1 o USR-1)
-        String idPrefix = "PM" + this.contadorProcesosManuales;
-        String nuevoId = idPrefix + "-" + String.format("%03d", contadorProcesosManuales++);
-        
-        // Calculo de Deadline (Si es periódico, deadline = periodo, si no, un valor por defecto)
-        // Como el usuario no lo edita, asumimos esta regla de negocio básica.
-        int deadlineCalculado = (periodo > 0) ? periodo : instrucciones * 2; 
-
-        // Creación del objeto Proceso
-        Proceso nuevoProceso = new Proceso(
-            nuevoId, 
-            nombre, 
-            instrucciones, 
-            deadlineCalculado, 
-            prioridad, 
-            esSistema, 
-            periodo
-        );
-        
-        nuevoProceso.setTiempoLlegada(this.relojDelSistema);
-        // --- LÓGICA DE ADMISIÓN (RAM vs DISCO) ---
-        
-        // Verificamos si cabe en la memoria (Usando la constante de Config)
-        if (memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
-            
-            // Si hay espacio -> A la cola de LISTOS (RAM)
-            nuevoProceso.setEstado(Estado.LISTO);
-            nuevoProceso.setTiempoLlegada(this.relojDelSistema);
-            
-            colaListos.encolar(nuevoProceso);
-            memoriaUsada += Config.TAMANO_PROCESO;
-            
-            System.out.println("[CREACION MANUAL] " + nuevoId + " agregado a RAM (Listo).");
-            
-            // Actualizar GUI
-            Principal.getInstancia().actualizarColaListos(colaListos);
-            Principal.getInstancia().actualizarMemoria(memoriaUsada, Config.MEMORIA_TOTAL);
-            
-        } else {
-            
-            // No hay espacio -> A la cola de SUSPENDIDOS (Disco)
-            nuevoProceso.setEstado(Estado.LISTO_SUSPENDIDO);
-            nuevoProceso.setTiempoLlegada(this.relojDelSistema);
-            
-            colaListosSuspendidos.encolar(nuevoProceso);
-            
-            System.out.println("[CREACION MANUAL] " + nuevoId + " enviado a SUSPENDIDOS (Memoria llena).");
-            
-            // Actualizar GUI
-            Principal.getInstancia().actualizarColaSuspendidos(colaListosSuspendidos);
-        }
-    }
-
-    private void bloquearProcesoActual() {
-        if (procesoEnEjecucion != null) {
-            // Tiempo de bloqueo aleatorio (ej. 3 a 7 ciclos)
-            int tiempoBloqueo = 3 + (int)(Math.random() * 5);
-            procesoEnEjecucion.establecerBloqueo(tiempoBloqueo);
-            
-            System.out.println("[I/O INTERRUPT] " + procesoEnEjecucion.getId() + " bloqueado por " + tiempoBloqueo + " ciclos.");
-            
-            // Mover a cola de bloqueados
-           
-            colaBloqueados.encolar(procesoEnEjecucion);
-            procesoEnEjecucion = null; // CPU Libre
-            
-            // Actualizar GUIs
-            Principal.getInstancia().actualizarCPU(null);
-            Principal.getInstancia().actualizarColaBloqueados(colaBloqueados);
-        }
-    }
-
-    private void revisarColaBloqueados() {
-        if (colaBloqueados.estaVacia()) return;
-        
-        boolean huboCambios = false;
-        
-        // Necesitamos recorrer y modificar. Como tu Cola es simple, 
-        // vamos a desencolar todo, actualizar y volver a encolar lo que siga bloqueado.
-        // (Estrategia segura para colas simples sin iterador)
-        
-        int tamañoOriginal = colaBloqueados.tamano();
-        
-        for (int i = 0; i < tamañoOriginal; i++) {
-            Proceso p = colaBloqueados.desencolar();
-            p.agregarTiempoBloqueado();
-            boolean terminoEspera = p.reducirTiempoBloqueo();
-            
-            if (terminoEspera) {
-                // Vuelve a la vida -> Cola de Listos
+            // Gestión de Memoria / Swap Inmediata
+            int memRequerida = p.getMemoriaRequerida();
+            if (memoriaRAMDisponible >= memRequerida) {
+                memoriaRAMDisponible -= memRequerida;
                 p.setEstado(Estado.LISTO);
                 colaListos.encolar(p);
-                System.out.println("[I/O DONE] " + p.getId() + " regresa a Listos.");
-                // Nota: También deberíamos actualizar la GUI de Listos
-                Principal.getInstancia().actualizarColaListos(colaListos);
+                System.out.println("[MEMORIA] Proceso " + p.getId() + " admitido directo en RAM.");
             } else {
-                // Sigue bloqueado -> De vuelta a la cola de bloqueados
-                colaBloqueados.encolar(p);
+                p.setEstado(Estado.LISTO_SUSPENDIDO);
+                colaListosSuspendidos.encolar(p);
+                System.out.println("[SWAP] RAM llena. Proceso " + p.getId() + " suspendido en SWAP.");
             }
-            huboCambios = true;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexColas.release();
         }
-        
-        if (huboCambios) {
-            Principal.getInstancia().actualizarColaBloqueados(colaBloqueados);
-        }
+        actualizarGUI();
+    }
+
+    // --- METODOS DE CONEXIÓN CON LA INTERFAZ (GETTERS Y SETTERS) ---
+    
+    public void setPolitica(String politica) {
+        this.politicaActual = politica;
+        System.out.println("[KERNEL] Política cambiada a: " + politica);
     }
     
-    private void checkNuevosProcesos() {
-        boolean huboCambiosListos = false;
-        boolean huboCambiosSuspendidos = false;
-        
+    public String getPolitica() { return this.politicaActual; }
+    
+    // Setters y Getters del Quantum Dinámico
+    public void setQuantumActual(int q) { this.quantumActual = q; }
+    public int getQuantumActual() { return this.quantumActual; }
+    
+    public Cola getColaListos() { return this.colaListos; }
+    
+    public Cola getColaListosPrioridad() { return this.colaListosPrioridad; }
+    
+    public Cola getColaBloqueados() { return this.colaBloqueados; }
+    
+    public Cola getColaListosSuspendidos() { return this.colaListosSuspendidos; }
+    
+    // NUEVO: Getter agregado para solucionar el error de Principal
+    public Cola getColaBloqueadosSuspendidos() { return this.colaBloqueadosSuspendidos; }
+    
+    public Proceso getProcesoEnEjecucion() { return this.procesoEnEjecucion; }
+    
+    public int getRelojSistema() { return this.relojDelSistema; }
+    
+    public int getMemoriaRAMDisponible() { return this.memoriaRAMDisponible; }
+    
+    // NUEVO: Para actualizar la barra de SWAP en la interfaz
+    public int getMemoriaEnSwap() {
+        int swapTotal = 0;
+        Nodo<Proceso> actual = colaListosSuspendidos.getFrente();
+        while (actual != null) {
+            swapTotal += actual.dato.getMemoriaRequerida();
+            actual = actual.siguiente;
+        }
+        return swapTotal;
+    }
+    
+    public void setActualizadorVisual(Runnable actualizador) {
+        this.actualizadorVisual = actualizador;
+    }
+
+    /**
+     * EL CORAZÓN DEL SISTEMA.
+     * Este método es llamado por el Reloj en cada Tick.
+     */
+    public void ejecutarCiclo(int cicloActual) {
+        this.relojDelSistema = cicloActual;
+
+        try {
+            // Protegemos las colas para que no choquen con el hilo de E/S
+            mutexColas.acquire(); 
+
+            // 1. Admitir nuevos procesos que llegaron en este ciclo de reloj a la RAM/Swap
+            admitirNuevosProcesos(cicloActual);
+
+            // 2. DISPATCHER: Planificar (Asignar CPU si está libre o aplicar expropiación)
+            planificarCPU();
+
+            // 3. CPU: Ejecutar el proceso que tenga asignado el procesador
+            ejecutarProcesoEnCPU(cicloActual);
+
+        } catch (InterruptedException e) {
+            System.err.println("Error de sincronización en las colas: " + e.getMessage());
+        } finally {
+            // Siempre liberar el semáforo
+            mutexColas.release();
+        }
+
+        // 4. Notificar a la interfaz que debe repintarse
+        actualizarGUI();
+    }
+
+    private void procesarColaBloqueados() {
+        int tamanoOriginal = colaBloqueados.tamano();
+        // Damos una vuelta completa a la cola de bloqueados
+        for (int i = 0; i < tamanoOriginal; i++) {
+            Proceso p = colaBloqueados.desencolar();
+            if (p != null) {
+                // NOTA: Como un hilo maneja el bloqueo, solo lo reencolamos
+                colaBloqueados.encolar(p);
+            }
+        }
+    }
+
+    private void admitirNuevosProcesos(int cicloActual) {
         Nodo<Proceso> actual = listaTodos.cabeza;
         while (actual != null) {
             Proceso p = actual.dato;
-            
-            // Solo procesamos si es NUEVO (aún no ha entrado al sistema)
-            if (p.getEstado() == Estado.NUEVO) {
-                p.setTiempoLlegada(this.relojDelSistema);
-                // Opción A: Hay espacio en RAM
-                if (memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
+            // Si el proceso acaba de llegar en este ciclo de reloj.
+            if (p.getEstado() == Estado.NUEVO && p.getTiempoLlegadaInt() <= cicloActual) {
+                
+                // --- GESTIÓN DE MEMORIA (PAGINACIÓN / SWAP) ---
+                // CAMBIO APLICADO: Ahora usamos la memoria real del proceso en lugar del fijo
+                int memRequerida = p.getMemoriaRequerida(); 
+                
+                // Verifica si hay RAM suficiente para el proceso
+                if (memoriaRAMDisponible >= memRequerida) {
+                    // Hay espacio: Entra a RAM (Cola de Listos)
+                    memoriaRAMDisponible -= memRequerida;
                     p.setEstado(Estado.LISTO);
-                    p.setTiempoLlegada(this.relojDelSistema);
                     colaListos.encolar(p);
-                    memoriaUsada += Config.TAMANO_PROCESO;
-                    huboCambiosListos = true;
-                    System.out.println("[ADMISION RAM] " + p.getId() + " -> Ready.");
-                } 
-                // Opción B: Memoria llena -> A Suspendidos (Disco)
-                else {
+                    System.out.println("[MEMORIA] Proceso " + p.getId() + " admitido en RAM. (RAM Libre: " + memoriaRAMDisponible + "MB)");
+                } else {
+                    // No hay espacio: Entra al Disco / SWAP (Suspendido)
                     p.setEstado(Estado.LISTO_SUSPENDIDO);
-                    p.setTiempoLlegada(this.relojDelSistema);
                     colaListosSuspendidos.encolar(p);
-                    huboCambiosSuspendidos = true;
-                    System.out.println("[ADMISION SWAP] " + p.getId() + " -> Suspendido (Memoria llena).");
+                    System.out.println("[SWAP] RAM llena. Proceso " + p.getId() + " suspendido en SWAP.");
                 }
             }
             actual = actual.siguiente;
         }
-
-        if (huboCambiosListos) Principal.getInstancia().actualizarColaListos(colaListos);
-        if (huboCambiosSuspendidos) Principal.getInstancia().actualizarColaSuspendidos(colaListosSuspendidos); // [NUEVO]
-        
-        // Actualizar barra de memoria
-        Principal.getInstancia().actualizarMemoria(memoriaUsada, Config.MEMORIA_TOTAL);
     }
-    
-    private void intentarSwapIn() {
-        if (!colaListosSuspendidos.estaVacia() && memoriaUsada + Config.TAMANO_PROCESO <= Config.MEMORIA_TOTAL) {
+
+    private void revisarSwapIn() {
+        // Revisa si hay procesos en Disco que ahora quepan en la RAM
+        int tamano = colaListosSuspendidos.tamano();
+        for (int i = 0; i < tamano; i++) {
             Proceso p = colaListosSuspendidos.desencolar();
-            p.setEstado(Estado.LISTO);
-            colaListos.encolar(p);
-            memoriaUsada += Config.TAMANO_PROCESO;
+            // CAMBIO APLICADO: Usar memoria real del proceso
+            int memRequerida = p.getMemoriaRequerida();
             
-            System.out.println("[SWAP IN] " + p.getId() + " movido de Disco a RAM.");
-            
-            // Actualizar ambas colas en la GUI
-            Principal.getInstancia().actualizarColaSuspendidos(colaListosSuspendidos);
-            Principal.getInstancia().actualizarColaListos(colaListos);
-            Principal.getInstancia().actualizarMemoria(memoriaUsada, Config.MEMORIA_TOTAL);
-            
-            // Si liberamos suficiente espacio, intenta traer a otro recursivamente (opcional)
-            // intentarSwapIn(); 
+            if (memoriaRAMDisponible >= memRequerida) {
+                // Hay espacio para traerlo del Swap a la RAM
+                memoriaRAMDisponible -= memRequerida;
+                p.setEstado(Estado.LISTO);
+                colaListos.encolar(p);
+                System.out.println("[SWAP-IN] Proceso " + p.getId() + " traído de SWAP a RAM. (RAM Libre: " + memoriaRAMDisponible + "MB)");
+            } else {
+                // Sigue sin caber, vuelve al Swap
+                colaListosSuspendidos.encolar(p);
+            }
         }
     }
-    
-    private void despacharProceso() {
-        if (!colaListos.estaVacia()) {
+
+    private void planificarCPU() {
+        // --- 1. PREEMPTION PARA SRT, PRIORIDAD Y EDF ---
+        // Estas políticas son expropiativas, revisamos si un nuevo proceso desplazará al actual
+        if (procesoEnEjecucion != null && 
+           (politicaActual.equals("SRT") || politicaActual.equals("PRIORIDAD") || politicaActual.equals("EDF"))) {
+            
+            Proceso candidato = extraerMejorProceso(politicaActual);
+            
+            if (candidato != null) {
+                boolean debeExpropiar = false;
+                
+                if (politicaActual.equals("SRT") && candidato.getInstruccionesRestantes() < procesoEnEjecucion.getInstruccionesRestantes()) {
+                    debeExpropiar = true;
+                } else if (politicaActual.equals("PRIORIDAD") && candidato.getPrioridad() < procesoEnEjecucion.getPrioridad()) {
+                    // OJO: Asumimos que número de prioridad MENOR significa MAYOR prioridad (ej. 1 es lo más importante)
+                    debeExpropiar = true;
+                } else if (politicaActual.equals("EDF") && candidato.getDeadline() < procesoEnEjecucion.getDeadline()) {
+                    // El que tenga el deadline más cercano (menor número) gana
+                    debeExpropiar = true;
+                }
+
+                if (debeExpropiar) {
+                    System.out.println("[KERNEL] " + politicaActual + " Expropiación: " + candidato.getId() + " desplaza a " + procesoEnEjecucion.getId());
+                    procesoEnEjecucion.setEstado(Estado.LISTO);
+                    colaListos.encolar(procesoEnEjecucion);
+                    procesoEnEjecucion = candidato;
+                    prepararProcesoParaEjecucion();
+                } else {
+                    colaListos.encolar(candidato); // Falsa alarma, lo devolvemos a la cola
+                }
+            }
+        }
+
+        // --- 2. ASIGNACIÓN DE CPU SI ESTÁ LIBRE ---
+        // Si la CPU está libre, metemos el siguiente proceso según la política actual
+        if (procesoEnEjecucion == null && !colaListos.estaVacia()) {
+            procesoEnEjecucion = extraerMejorProceso(politicaActual);
+            prepararProcesoParaEjecucion();
+            if (politicaActual.equals("RR") || politicaActual.equals("Round Robin")) {
+                contadorQuantum = 0; // Reiniciamos el quantum al asignar un nuevo proceso
+            }
+        }
+    }
+
+    /**
+     * Helper que escanea la cola de listos y extrae el proceso que mejor cumpla 
+     * con los criterios de la política actual (FCFS, RR, SRT, PRIORIDAD, EDF).
+     */
+    private Proceso extraerMejorProceso(String politica) {
+        if (colaListos.estaVacia()) return null;
+        
+        // FCFS y RR simplemente sacan el primero de la fila (FIFO Básico)
+        if (politica.equals("FCFS") || politica.equals("RR") || politica.equals("Round Robin")) {
+            return colaListos.desencolar();
+        }
+
+        Proceso mejor = null;
+        int tamano = colaListos.tamano();
+        double mejorValor = Double.MAX_VALUE;
+
+        // Pasada 1: Evaluar toda la cola para encontrar el "Mejor" candidato
+        for (int i = 0; i < tamano; i++) {
             Proceso p = colaListos.desencolar();
-            p.setEstado(Estado.EJECUCION);
-            
-            // --- CORRECCIÓN MÉTRICA TIEMPO RESPUESTA ---
-            if (p.getTiempoPrimeraEjecucion() == -1) {
-                // 1. Marcar el ciclo actual como primera ejecución
-                p.setTiempoPrimeraEjecucion(this.relojDelSistema);
-                
-                // 2. Obtener llegada (Asegurándonos que sea el ciclo, ej: 0, 5, 10)
-                int llegada = p.getTiempoLlegadaInt(); 
-                
-                // 3. Calcular respuesta: Ciclo Actual (ej: 50) - Llegada (ej: 0) = 50
-                int respuesta = this.relojDelSistema - llegada;
-                
-                // 4. Protección contra números negativos o absurdos
-                //if (respuesta < 0) respuesta = 0; 
-                
-                this.sumaTiempoRespuesta += respuesta;
-                
-                // Debug (Opcional): Si sale un número raro, esto te lo dirá en consola
-                // System.out.println("Proceso " + p.getId() + " Respuesta: " + respuesta + " (Reloj: " + this.relojDelSistema + " - Llegada: " + llegada + ")");
+            double valorActual = 0;
+
+            if (politica.equals("SRT")) {
+                valorActual = p.getInstruccionesRestantes(); // Menor número de instrucciones restantes
+            } else if (politica.equals("PRIORIDAD")) {
+                valorActual = p.getPrioridad(); // Menor número de prioridad (1 es más prioritario que 99)
+            } else if (politica.equals("EDF")) {
+                valorActual = p.getDeadline(); // Menor deadline (el tiempo límite más cercano)
             }
-            this.procesoEnEjecucion = p;
-            
-            // Actualizar GUI: Quitamos de la cola y ponemos en CPU
-            Principal.getInstancia().actualizarColaListos(colaListos);
-            Principal.getInstancia().actualizarCPU(p);
-            
-            System.out.println("[DISPATCH] " + p.getId() + " entra a CPU.");
-        }
-        
-       
 
-    }
-    
-    private void terminarProceso(Proceso p) {
-        p.setEstado(Estado.TERMINADO);
-        p.setTiempoFinalizacion(this.relojDelSistema); // Marcar hora fin
-
-        this.procesoEnEjecucion = null;
-        this.memoriaUsada -= Config.TAMANO_PROCESO;
-        
-        // --- NUEVO: Lógica de Estadísticas ---
-        this.procesosTerminados++;
-        this.totalProcesosTerminados++;
-        
-        // 1. Verificar Deadline (Tiempo Retorno <= Deadline)
-        // Tiempo Retorno = (Fin - Llegada)
-        int tiempoRetorno = p.getTiempoFinalizacion() - (int)p.getTiempoLlegada();
-        if (tiempoRetorno <= p.getDeadline()) {
-            this.totalProcesosCumplenDeadline++;
-        }
-        
-        // 2. Acumular tiempo bloqueado global
-        this.sumaTiempoBloqueado += p.getTiempoTotalBloqueado();
-        // -------------------------------------
-
-        // Actualizar GUI CPU (ponerla libre)
-        Principal.getInstancia().actualizarCPU(null);
-        System.out.println("[TERMINADO] " + p.getId());
-
-        intentarSwapIn();
-    }
-    
-   public void cambiarPolitica(String nuevaPolitica) {
-        this.politicaActual = nuevaPolitica;
-        System.out.println("[KERNEL] Cambio de política a: " + nuevaPolitica);
-
-        // 1. Reordenar la cola de listos inmediatamente
-        reordenarColaListos();
-        
-        // 2. Verificar si el proceso en CPU debe ser expulsado (Preemption)
-        verificarPreempcion();
-
-        // 3. Refrescar la interfaz
-        Principal.getInstancia().actualizarColaListos(colaListos);
-        Principal.getInstancia().actualizarCPU(procesoEnEjecucion);
-    }
-    
-    private void reordenarColaListos() {
-    if (colaListos.estaVacia()) return;
-
-    // 1. Extraer todos los procesos a una lista temporal para ordenar
-    ListaSimple<Proceso> temporal = new ListaSimple<>();
-    while (!colaListos.estaVacia()) {
-        temporal.agregarFinal(colaListos.desencolar());
-    }
-
-    // 2. Aplicar algoritmo de ordenamiento según política
-    // Aquí implementas la lógica de comparación
-    ordenarListaSegunPolitica(temporal);
-
-    // 3. Devolver a la cola ya ordenados
-    Nodo<Proceso> aux = temporal.cabeza;
-    while (aux != null) {
-        colaListos.encolar(aux.dato);
-        aux = aux.siguiente;
-    }
-}
-    
-   private void ordenarListaSegunPolitica(ListaSimple<Proceso> lista) {
-        if (lista.cabeza == null || lista.cabeza.siguiente == null) return;
-
-        // IMPORTANTE: Round Robin es FIFO, no se debe reordenar la cola.
-        if (politicaActual.equals("Round Robin")) return;
-
-        boolean huboIntercambio;
-        do {
-            huboIntercambio = false;
-            Nodo<Proceso> actual = lista.cabeza;
-            Nodo<Proceso> siguiente = lista.cabeza.siguiente;
-
-            while (siguiente != null) {
-                boolean debeCambiar = false;
-                Proceso p1 = actual.dato;
-                Proceso p2 = siguiente.dato;
-
-                switch (politicaActual) {
-                    case "FCFS":
-                        if (p1.getTiempoLlegada() > p2.getTiempoLlegada()) debeCambiar = true;
-                        break;
-
-                    case "SRT":
-                        if (p1.getInstruccionesRestantes() > p2.getInstruccionesRestantes()) debeCambiar = true;
-                        break;
-
-                    case "EDF":
-                        if (p1.getDeadline() > p2.getDeadline()) debeCambiar = true;
-                        break;
-
-                    // --- NUEVA LÓGICA DE PRIORIDAD ---
-                    case "Prioridad":
-                        // Criterio: Menor valor numérico = Mayor prioridad
-                        if (p1.getPrioridad() > p2.getPrioridad()) {
-                            debeCambiar = true;
-                        } 
-                        // Desempate por llegada (FIFO) si tienen misma prioridad
-                        else if (p1.getPrioridad() == p2.getPrioridad()) {
-                            if (p1.getTiempoLlegada() > p2.getTiempoLlegada()) {
-                                debeCambiar = true;
-                            }
-                        }
-                        break;
-                    // ---------------------------------
-                }
-
-                if (debeCambiar) {
-                    Proceso temp = actual.dato;
-                    actual.dato = siguiente.dato;
-                    siguiente.dato = temp;
-                    huboIntercambio = true;
-                }
-                actual = siguiente;
-                siguiente = siguiente.siguiente;
+            if (valorActual < mejorValor || mejor == null) {
+                mejorValor = valorActual;
+                mejor = p;
             }
-        } while (huboIntercambio);
-    }
-    
-    private void verificarPreempcion() {
-        if (procesoEnEjecucion == null || colaListos.estaVacia()) return;
-
-        Proceso mejorCandidato = colaListos.getFrente().dato;
-        boolean debeExpulsar = false;
-
-        switch (politicaActual) {
-            case "SRT":
-                if (mejorCandidato.getInstruccionesRestantes() < procesoEnEjecucion.getInstruccionesRestantes()) 
-                    debeExpulsar = true;
-                break;
-                
-            case "EDF":
-                if (mejorCandidato.getDeadline() < procesoEnEjecucion.getDeadline()) 
-                    debeExpulsar = true;
-                break;
-
-            // --- EXPROPIACIÓN POR PRIORIDAD ---
-            case "Prioridad":
-                // Si el proceso en cola tiene un número MENOR (mejor prioridad)
-                // que el proceso actual -> Expulsar.
-                if (mejorCandidato.getPrioridad() < procesoEnEjecucion.getPrioridad()) {
-                    debeExpulsar = true;
-                    System.out.println("[PRIO PREEMPTION] " + procesoEnEjecucion.getId() + 
-                                       " (Prio " + procesoEnEjecucion.getPrioridad() + ")" +
-                                       " expulsado por " + mejorCandidato.getId() + 
-                                       " (Prio " + mejorCandidato.getPrioridad() + ")");
-                }
-                break;
-            // ----------------------------------
+            colaListos.encolar(p); // Devolvemos temporalmente el proceso a la cola
         }
 
-        if (debeExpulsar) {
-            procesoEnEjecucion.setEstado(Estado.LISTO);
-            colaListos.encolar(procesoEnEjecucion);
-            procesoEnEjecucion = null;
-            contadorQuantum = 0; // Resetear siempre al salir de CPU
+        // Pasada 2: Extraer definitivamente el candidato ganador y dejar los demás
+        for (int i = 0; i < tamano; i++) {
+            Proceso p = colaListos.desencolar();
+            if (p != mejor) {
+                colaListos.encolar(p); // Reencolar los perdedores
+            }
+        }
+        return mejor;
+    }
+
+    private void prepararProcesoParaEjecucion() {
+        procesoEnEjecucion.setEstado(Estado.EJECUCION);
+        System.out.println("[KERNEL] Context Switch: CPU asignada a " + procesoEnEjecucion.getId());
+    }
+
+    private void ejecutarProcesoEnCPU(int cicloActual) {
+        if (procesoEnEjecucion != null) {
             
-            reordenarColaListos(); // Reordenar para que el expulsado se ubique bien
-            despacharProceso();    // Meter al nuevo
+            // Si es su primera vez en CPU, calculamos tiempo de respuesta
+            if (procesoEnEjecucion.getPC() == 0) {
+                procesoEnEjecucion.setTiempoPrimeraEjecucion(cicloActual);
+                sumaTiempoRespuesta += (cicloActual - procesoEnEjecucion.getTiempoLlegadaInt());
+            }
+
+            // Ejecutamos 1 instrucción usando tu método original en Proceso.java
+            procesoEnEjecucion.ejecutar(1);
+            
+            // --- VERIFICAR INTERRUPCIÓN DETERMINÍSTICA (E/S) ---
+            if (!procesoEnEjecucion.estaTerminado() && 
+                procesoEnEjecucion.getPC() == procesoEnEjecucion.getCicloExcepcion() && 
+                !procesoEnEjecucion.isInterrupcionGenerada()) {
+                
+                System.out.println("[KERNEL] Interrupción: Proceso " + procesoEnEjecucion.getId() + " solicita I/O en PC=" + procesoEnEjecucion.getPC());
+                
+                procesoEnEjecucion.setEstado(Estado.BLOQUEADO); 
+                procesoEnEjecucion.setInterrupcionGenerada(true);
+                colaBloqueados.encolar(procesoEnEjecucion);
+                
+                // DISPARAR HILO INDEPENDIENTE PARA E/S
+                new HiloInterrupcion(procesoEnEjecucion).start();
+                
+                procesoEnEjecucion = null; // CPU libre
+                return;
+            }
+            
+            // --- VERIFICAR SI TERMINÓ ---
+            if (procesoEnEjecucion.estaTerminado()) {
+                System.out.println("[KERNEL] Proceso " + procesoEnEjecucion.getId() + " TERMINADO.");
+                procesoEnEjecucion.setEstado(Estado.TERMINADO);
+                procesoEnEjecucion.setTiempoFinalizacion(cicloActual);
+                
+                // Recopilar estadísticas básicas
+                totalProcesosTerminados++;
+                if (cicloActual <= procesoEnEjecucion.getDeadline()) {
+                    totalProcesosCumplenDeadline++;
+                }
+                
+                // LIBERAR MEMORIA RAM 
+                // CAMBIO APLICADO: Liberamos la memoria real que usaba el proceso
+                memoriaRAMDisponible += procesoEnEjecucion.getMemoriaRequerida();
+                System.out.println("[MEMORIA] RAM liberada. (RAM Libre: " + memoriaRAMDisponible + "MB)");
+                
+                // Liberar CPU
+                procesoEnEjecucion = null; 
+                
+                // INTENTAR SWAP-IN TRAS LIBERAR MEMORIA
+                revisarSwapIn();
+                
+            } else if (politicaActual.equals("RR") || politicaActual.equals("Round Robin")) {
+                // --- EXPROPIACIÓN POR QUANTUM (ROUND ROBIN) ---
+                contadorQuantum++;
+                // CAMBIO APLICADO: Usa la variable `quantumActual` del JSpinner
+                if (contadorQuantum >= quantumActual) {
+                    System.out.println("[KERNEL] RR: Quantum expirado (" + quantumActual + ") para " + procesoEnEjecucion.getId());
+                    procesoEnEjecucion.setEstado(Estado.LISTO);
+                    colaListos.encolar(procesoEnEjecucion);
+                    procesoEnEjecucion = null; // Liberamos CPU para el siguiente
+                }
+            }
         }
     }
-    
-    public int getRelojSistema() {return this.relojDelSistema;}
-    
-    // --- MÉTODO DE REPORTE ---
+
+    /**
+     * NUEVO MÉTODO THREAD-SAFE: Invocado por el HiloInterrupcion al finalizar su sleep
+     * para reincorporar el proceso al sistema evitando condiciones de carrera.
+     * NUEVO COMPORTAMIENTO: Busca tanto en colaBloqueados como en colaBloqueadosSuspendidos.
+     */
+    public void moverDeBloqueadoAListoSeguro(Proceso p) {
+        try {
+            mutexColas.acquire(); 
+            
+            boolean estabaEnRAM = false;
+            boolean estabaEnSwap = false;
+            
+            // Reconstruir la colaBloqueados extrayendo al proceso que ya terminó su E/S
+            Cola colaTemp = new Cola();
+            while (!colaBloqueados.estaVacia()) {
+                Proceso bloqueadoActual = colaBloqueados.desencolar();
+                if (bloqueadoActual != null) {
+                    if (!bloqueadoActual.getId().equals(p.getId())) {
+                        colaTemp.encolar(bloqueadoActual);
+                    } else {
+                        estabaEnRAM = true;
+                    }
+                }
+            }
+            colaBloqueados = colaTemp;
+            
+            // Reconstruir BloqueadosSuspendidos por si fue mandado al Swap
+            Cola colaTempSwap = new Cola();
+            while (!colaBloqueadosSuspendidos.estaVacia()) {
+                Proceso bloqueadoActual = colaBloqueadosSuspendidos.desencolar();
+                if (bloqueadoActual != null) {
+                    if (!bloqueadoActual.getId().equals(p.getId())) {
+                        colaTempSwap.encolar(bloqueadoActual);
+                    } else {
+                        estabaEnSwap = true;
+                    }
+                }
+            }
+            colaBloqueadosSuspendidos = colaTempSwap;
+            
+            if (estabaEnRAM) {
+                // Insertarlo de vuelta en Listos
+                p.setEstado(Estado.LISTO);
+                colaListos.encolar(p);
+                System.out.println("[KERNEL] HILO ASÍNCRONO: Proceso " + p.getId() + " completó E/S y regresó a Listos.");
+            } else if (estabaEnSwap) {
+                // Insertarlo de vuelta en Listos Suspendidos (Disco)
+                p.setEstado(Estado.LISTO_SUSPENDIDO);
+                colaListosSuspendidos.encolar(p);
+                System.out.println("[KERNEL] HILO ASÍNCRONO: Proceso " + p.getId() + " completó E/S y regresó a Listos Suspendidos.");
+            }
+            
+        } catch (InterruptedException e) {
+            System.out.println("Error reincorporando proceso de E/S: " + e.getMessage());
+        } finally {
+            mutexColas.release();
+        }
+        
+        actualizarGUI(); // Refrescar vista
+    }
+
+    private void actualizarGUI() {
+        // En lugar de instanciar o depender directamente de Principal, 
+        // ejecutamos el callback que la interfaz nos pasó al inicializar.
+        if (actualizadorVisual != null) {
+            actualizadorVisual.run();
+        }
+    }
+
+    // --- MÉTODOS DE REPORTE ---
     public String obtenerReporteEstadisticas() {
-        
+        if (totalProcesosTerminados == 0) return "Aún no hay procesos terminados.";
 
         double porcentajeDeadline = ((double) totalProcesosCumplenDeadline / totalProcesosTerminados) * 100;
         double promedioRespuesta = (double) sumaTiempoRespuesta / totalProcesosTerminados;
-        // Nota: El promedio de bloqueo se suele calcular sobre el total de procesos terminados
-        // o solo sobre los que se bloquearon. Aquí usaremos el total terminados para ver el impacto global.
         double promedioBloqueo = (double) sumaTiempoBloqueado / totalProcesosTerminados;
 
         StringBuilder sb = new StringBuilder();
@@ -535,7 +509,6 @@ public class Administrador {
         sb.append(String.format("2. Tiempo Promedio de Respuesta: %.2f ciclos\n", promedioRespuesta));
         sb.append("   (Tiempo desde llegada hasta primera ejecución)\n\n");
         sb.append(String.format("3. Tiempo Promedio Bloqueado: %.2f ciclos\n", promedioBloqueo));
-        sb.append("   (Tiempo promedio en estado I/O wait)\n");
         
         return sb.toString();
     }

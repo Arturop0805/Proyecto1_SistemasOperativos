@@ -4,13 +4,20 @@
  */
 package Interfaces;
 
+
+
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Cursor; // NUEVO
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter; // NUEVO
+import java.awt.event.MouseEvent; // NUEVO
 import javax.swing.JPanel;
 
+import Modelo.Proceso; // NUEVO
+import Simulacion.Administrador; // NUEVO
 /**
  *
  * @author Artur
@@ -26,6 +33,26 @@ class PanelGraficaCPU extends JPanel {
             for (int i = 0; i < maxPuntos; i++) {
                 historialUso.add(0);
             }
+            
+            this.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    this.setToolTipText("Haz clic para ver el PCB del proceso en CPU");
+
+    // Añadimos el escuchador de clics en el panel
+    this.addMouseListener(new MouseAdapter() {
+        @Override
+        public void mouseClicked(MouseEvent e) {
+            // Buscamos cuál es el proceso que el Administrador tiene en la CPU en este milisegundo
+            // NOTA: Cambia "getProcesoEnEjecucion()" por el nombre exacto de tu método getter en Administrador
+            Proceso procesoEnCPU = Administrador.getInstancia().getProcesoEnEjecucion();
+            
+            if (procesoEnCPU != null) {
+                // Instanciamos y mostramos la ventana flotante directamente
+                VentanaInfoProceso detalles = new VentanaInfoProceso(procesoEnCPU);
+                detalles.setVisible(true);
+            }
+        }
+    });
+            
         }
 
         public void agregarDato(int porcentaje) {

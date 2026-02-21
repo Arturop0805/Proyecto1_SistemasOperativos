@@ -3,13 +3,15 @@ Interfaces\VentanaInfoProceso$1.class
 Simulacion\Config.class
 Interfaces\PanelGraficaCPU.class
 ComponentesVisuales\LabelRedondo$1.class
+Interfaces\PanelGraficaCPU$1.class
 Interfaces\Principal.class
 Simulacion\Reloj.class
-Modelo\PCB.class
+Simulacion\HiloInterrupcion.class
 Interfaces\Principal$1.class
 Simulacion\Administrador.class
 Utilidades\GeneradorProcesos.class
 Interfaces\VentanaInfoProceso.class
+Interfaces\Principal$2.class
 Modelo\Proceso.class
 com\mycompany\so_proyecto1\SO_Proyecto1.class
 ComponentesVisuales\LabelRedondo.class

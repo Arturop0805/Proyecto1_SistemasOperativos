@@ -17,7 +17,7 @@ package Simulacion;
 public class Config {
     
     // Memoria
-    public static final int MEMORIA_TOTAL = 256; // MB o Bloques
+    public static final int MEMORIA_TOTAL = 1024; // MB o Bloques
     public static final int MEMORIA_RESERVADA_SO = 128; 
     
     // Planificación
