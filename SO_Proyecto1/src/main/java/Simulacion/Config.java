@@ -34,7 +34,7 @@ public class Config {
     
     public static final double PROB_BLOQUEO = 0.5;
     
-    public static int TAMANO_PROCESO = 32;
+    public static int TAMANO_PROCESO = 64;
     
     public static int NUM_PROCESOS_INICIALES = 10;
 }

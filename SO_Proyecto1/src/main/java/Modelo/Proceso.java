@@ -33,7 +33,7 @@ public class Proceso {
     private int cicloExcepcion;
     private int ciclosResolver;
     private int tiempoTotalBloqueado; // Para estadísticas
-    private boolean interrupcionGenerada; // NUEVO: Flag para no repetir I/O
+    private boolean interrupcionGenerada; // Flag para no repetir I/O
     
     // Estado
     private Estado estado;
@@ -44,6 +44,12 @@ public class Proceso {
 
     // Memoria (NUEVO)
     private int memoriaRequerida;
+
+    // INDICADORES ADICIONALES
+    // Indica si el proceso fue abortado explícitamente por vencimiento de deadline
+    private boolean abortadoPorDeadline = false;
+    // Indica si el proceso actualmente reside en RAM (true) o está en swap (false)
+    private boolean enMemoria = false;
 
     /**
      * Constructor actualizado.
@@ -69,9 +75,12 @@ public class Proceso {
         this.tiempoFinalizacion = 0;
         this.tiempoTotalBloqueado = 0;
         
-        // Requerimiento: PC y MAR inician y avanzan linealmente
+        // PC y MAR inician y avanzan linealmente
         this.pc = 0;
         this.mar = 1000; // Dirección base de memoria simulada
+
+        this.abortadoPorDeadline = false;
+        this.enMemoria = false;
     }
 
     // --- MÉTODOS DE SIMULACIÓN DE EJECUCIÓN ---
@@ -79,7 +88,7 @@ public class Proceso {
     public void ejecutar(int cantidad) {
         if (!estaTerminado()) {
             instruccionesEjecutadas += cantidad;
-            // Requerimiento: PC y MAR incrementan una unidad por ciclo
+            // PC y MAR incrementan una unidad por ciclo
             pc += cantidad; 
             mar += cantidad; 
             if (instruccionesEjecutadas > totalInstrucciones) {
@@ -102,7 +111,7 @@ public class Proceso {
     public int getDeadline() { return deadline; }
     public int getPrioridad() { return prioridad; }
     public boolean isEsSistema() { return esSistema; }
-    public int getPeriodo(){return this.periodo;}
+    
     public Estado getEstado() { return estado; }
     public void setEstado(Estado estado) { this.estado = estado; }
     
@@ -123,8 +132,37 @@ public class Proceso {
 
     public void sumarTiempoBloqueado(int ciclos) { this.tiempoTotalBloqueado += ciclos; }
     public int getTiempoTotalBloqueado() { return tiempoTotalBloqueado; }
-    public void setMemoriaRequerida(int memoria){this.memoriaRequerida = memoria;}
+    
+    // --- MÉTODOS DE MEMORIA ---
+    public void setMemoriaRequerida(int memoria) { 
+        this.memoriaRequerida = memoria; 
+    }
+    public void setMemoriaRequerida(double memoria) { 
+        this.memoriaRequerida = (int) memoria; 
+    }
+    public int getMemoriaRequerida() { 
+        return this.memoriaRequerida; 
+    }
+
+    // --- DEADLINE (Requerimientos) ---
+    public int getDeadlineAbsoluto() {
+        // El tiempo real límite es el momento en el que llegó + el plazo (deadline)
+        return tiempoLlegada + deadline;
+    }
+
+    public int getDeadlineRestante(int cicloActual) {
+        // Cuánto le queda = (Límite Absoluto) - (Reloj Actual)
+        return getDeadlineAbsoluto() - cicloActual;
+    }
+
     public int getPC() { return pc; }
     public int getMAR() { return mar; }
-    public int getMemoriaRequerida() { return memoriaRequerida; }
+
+    // --- FLAG abortadoPorDeadline ---
+    public boolean isAbortadoPorDeadline() { return abortadoPorDeadline; }
+    public void setAbortadoPorDeadline(boolean abortadoPorDeadline) { this.abortadoPorDeadline = abortadoPorDeadline; }
+
+    // --- FLAG enMemoria ---
+    public boolean isEnMemoria() { return enMemoria; }
+    public void setEnMemoria(boolean enMemoria) { this.enMemoria = enMemoria; }
 }

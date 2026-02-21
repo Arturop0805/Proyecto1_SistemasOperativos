@@ -64,7 +64,7 @@ public class GeneradorProcesos {
         int instrucciones = 10 + random.nextInt(291);
         
         // Deadline basado en instrucciones (Holgura aleatoria)
-        int deadline = instrucciones + random.nextInt(500);
+        int deadline = instrucciones + random.nextInt(1550 - 500 + 1) + 500;
         
         // Periodo
         int periodo = 0;
