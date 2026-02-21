@@ -327,7 +327,7 @@ public class Principal extends JFrame {
                 Proceso p = GeneradorProcesos.crearProcesoAleatorio();
                 aplicarLimiteSeguridadMemoria(p);
                 historialProcesos.agregarFinal(p);
-                despacharProceso(p);
+                Administrador.getInstancia().admitirProceso(p);
             }
             actualizarInterfaz();
         });
@@ -336,7 +336,7 @@ public class Principal extends JFrame {
             Proceso p = GeneradorProcesos.crearProcesoAleatorio();
             aplicarLimiteSeguridadMemoria(p);
             historialProcesos.agregarFinal(p);
-            despacharProceso(p);
+            Administrador.getInstancia().admitirProceso(p);
             actualizarInterfaz();
         });
 
@@ -394,7 +394,7 @@ public class Principal extends JFrame {
                 
                 aplicarLimiteSeguridadMemoria(p);
                 historialProcesos.agregarFinal(p);
-                despacharProceso(p);
+                Administrador.getInstancia().admitirProceso(p);
                 actualizarInterfaz();
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "Solo números en Instrucciones, Prioridad, Deadline y Periodo.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -423,20 +423,7 @@ public class Principal extends JFrame {
     /**
      * MÉTODO CLAVE: Verifica la RAM disponible antes de ingresar un proceso nuevo.
      */
-    private void despacharProceso(Proceso p) {
-        Administrador admin = Administrador.getInstancia();
-        int ramOcupada = calcularMemoriaRAMActual();
-
-        if (ramOcupada + p.getMemoriaRequerida() <= Config.MEMORIA_TOTAL) {
-            p.setEstado(Estado.LISTO);
-            admin.getColaListos().encolar(p); 
-            System.out.println("[KERNEL] Proceso " + p.getId() + " admitido en RAM (Cola Listos). Req: " + p.getMemoriaRequerida() + "MB");
-        } else {
-            p.setEstado(Estado.LISTO_SUSPENDIDO);
-            admin.getColaListosSuspendidos().encolar(p);
-            System.out.println("[KERNEL-SWAP] RAM LLENA. Proceso " + p.getId() + " enviado directo a Swap (Listos Suspendidos). Req: " + p.getMemoriaRequerida() + "MB");
-        }
-    }
+   
 
     private int calcularMemoriaRAMActual() {
         Administrador admin = Administrador.getInstancia();
@@ -720,12 +707,7 @@ public class Principal extends JFrame {
         lbl.setCursor(new Cursor(Cursor.HAND_CURSOR)); // Cursor de mano interactivo
         
         // EVENTO: Mostrar modal al hacer clic en cualquier proceso
-        lbl.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                new VentanaInfoProceso(p).setVisible(true);
-            }
-        });
+        
 
         panel.add(lbl);
     }

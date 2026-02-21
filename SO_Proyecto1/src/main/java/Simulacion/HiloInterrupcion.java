@@ -9,6 +9,7 @@ package Simulacion;
  * @author tomas
  */
 import Modelo.Proceso;
+import Modelo.Estado;
 import java.util.Random;
 
 /**
@@ -33,6 +34,14 @@ public class HiloInterrupcion extends Thread {
             // Simular el retraso del hardware
             Thread.sleep(tiempoDormirMs);
             
+            // --- FIX BUG 3: Procesos Fantasma ---
+            // Si el proceso ya fue abortado por deadline mientras dormía, NO debemos regresarlo a Listo.
+            if (proceso.getEstado() == Estado.TERMINADO) {
+                System.out.println("[THREAD-I/O] El proceso " + proceso.getId() + " ya finalizó (ej. por Deadline). Ignorando interrupción.");
+                return; 
+            }
+            // ------------------------------------
+
             // Registrar estadísticas usando tus propios métodos
             proceso.sumarTiempoBloqueado(proceso.getCiclosResolver());
             
