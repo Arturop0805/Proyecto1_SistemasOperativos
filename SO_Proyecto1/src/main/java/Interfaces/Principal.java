@@ -531,41 +531,7 @@ public class Principal extends JFrame {
     /**
      * Muestra el modal del PCB del proceso con sus atributos detallados.
      */
-    private void mostrarPCB(Proceso p) {
-        JDialog modal = new JDialog(this, "PCB - Detalle del Proceso", true);
-        modal.setSize(380, 400);
-        modal.setLocationRelativeTo(this);
-        modal.setLayout(new BorderLayout(10, 10));
-        
-        JPanel grid = new JPanel(new GridLayout(10, 2, 5, 10));
-        grid.setBorder(new EmptyBorder(15, 15, 15, 15));
-        
-        grid.add(new JLabel("ID del Proceso:")); grid.add(new JLabel("<html><b>" + p.getId() + "</b></html>"));
-        grid.add(new JLabel("Nombre:")); grid.add(new JLabel(p.getNombre()));
-        
-        JLabel lblEstado = new JLabel("<html><b><font color='blue'>" + p.getEstado() + "</font></b></html>");
-        grid.add(new JLabel("Estado Actual:")); grid.add(lblEstado);
-        
-        grid.add(new JLabel("Tipo:")); grid.add(new JLabel(p.isEsSistema() ? "Proceso de Sistema" : "Proceso de Usuario"));
-        grid.add(new JLabel("Prioridad Base:")); grid.add(new JLabel(String.valueOf(p.getPrioridad())));
-        
-        // Uso try-catch simples por si algún getter no se llama exactamente así en tu clase Proceso
-        grid.add(new JLabel("Instrucciones:")); 
-grid.add(new JLabel(p.getPC() + " / " + p.getTotalInstrucciones()));
-        grid.add(new JLabel("Memoria:")); grid.add(new JLabel(p.getMemoriaRequerida() + " MB"));
-        grid.add(new JLabel("Deadline:")); grid.add(new JLabel(String.valueOf(p.getDeadline())));
-        grid.add(new JLabel("Periodo:")); grid.add(new JLabel(p.getPeriodo() > 0 ? String.valueOf(p.getPeriodo()) : "Aperiódico"));
-        
-        modal.add(grid, BorderLayout.CENTER);
-        
-        JButton btnCerrar = new JButton("Cerrar Visor");
-        btnCerrar.addActionListener(e -> modal.dispose());
-        JPanel pnlSur = new JPanel();
-        pnlSur.add(btnCerrar);
-        modal.add(pnlSur, BorderLayout.SOUTH);
-        
-        modal.setVisible(true);
-    }
+    
 
     private void redirigirTerminalAlLog() {
         PrintStream printStream = new PrintStream(new OutputStream() {
@@ -757,7 +723,7 @@ grid.add(new JLabel(p.getPC() + " / " + p.getTotalInstrucciones()));
         lbl.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                mostrarPCB(p);
+                new VentanaInfoProceso(p).setVisible(true);
             }
         });
 

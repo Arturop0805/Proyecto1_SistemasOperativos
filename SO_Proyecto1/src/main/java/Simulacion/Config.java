@@ -32,7 +32,7 @@ public class Config {
     // Paths (Para lectura de archivos)
     public static final String RUTA_ARCHIVO_PROCESOS = "procesos.csv";
     
-    public static final double PROB_BLOQUEO = 0.1;
+    public static final double PROB_BLOQUEO = 0.5;
     
     public static int TAMANO_PROCESO = 32;
     
