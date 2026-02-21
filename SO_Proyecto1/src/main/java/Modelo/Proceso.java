@@ -1,139 +1,130 @@
 package Modelo;
-import Modelo.PCB;
+
 /**
  *
  * @author tomas
  */
 
 
+/**
+ * Representa el Bloque de Control de Proceso (PCB).
+ * Almacena toda la información y estado de un proceso simulado.
+ */
 public class Proceso {
     
-    // Datos Estáticos
-    private String id;               
+    // Identificación
+    private String id;
     private String nombre;
+    private boolean esSistema;
+    
+    // Tiempos y Planificación
+    private int tiempoLlegada;
+    private int tiempoPrimeraEjecucion;
+    private int tiempoFinalizacion;
+    private int deadline;
+    private int prioridad; // 1 a 99 (menor número = mayor prioridad)
+    private int periodo;
+    
+    // Ejecución e Instrucciones
     private int totalInstrucciones;
-    private int prioridadInicial;
-    private int deadline;  
-    private int tamano_proceso;
-
-    private boolean esDeSistema;     // true = SO, false = Usuario
-    private int periodo; 
-    private PCB PCB;
-  // 0 = Aperiodico, >0 = Periodico
-             
-
+    private int instruccionesEjecutadas;
     
-    // Datos Dinámicos (El contexto de ejecución)
-    private int pc;                      // Program Counter
-    private int mar;                     // Memory Address Register
-    private Estado estado;               
-    private int ciclosBloqueadoRestantes;
-    private long tiempoLlegada;          // <--- Variable necesaria para el error
+    // E/S (Bloqueos)
+    private int cicloExcepcion;
+    private int ciclosResolver;
+    private int tiempoTotalBloqueado; // Para estadísticas
+    private boolean interrupcionGenerada; // NUEVO: Flag para no repetir I/O
     
-    // --- NUEVAS VARIABLES PARA ESTADÍSTICAS ---
-    private int tiempoPrimeraEjecucion = -1; // -1 indica que nunca se ha ejecutado
-    private int tiempoTotalBloqueado = 0;
-    private int tiempoFinalizacion = 0;
+    // Estado
+    private Estado estado;
     
+    // Registros simulados (Para la Interfaz)
+    private int pc;
+    private int mar;
 
-    public Proceso(String id, String nombre, int totalInstrucciones, int deadline, int prioridad, boolean esSistema, int periodo) {
+    // Memoria (NUEVO)
+    private int memoriaRequerida;
+
+    /**
+     * Constructor actualizado.
+     */
+    public Proceso(String id, String nombre, int instrucciones, int deadline, int prioridad, 
+                   boolean esSistema, int periodo, int cicloExcepcion, int ciclosResolver, int memoriaRequerida) {
         this.id = id;
         this.nombre = nombre;
-        this.totalInstrucciones = totalInstrucciones;
+        this.totalInstrucciones = instrucciones;
         this.deadline = deadline;
-        this.prioridadInicial = prioridad;
-        this.esDeSistema = esSistema;
+        this.prioridad = prioridad;
+        this.esSistema = esSistema;
         this.periodo = periodo;
+        this.cicloExcepcion = cicloExcepcion;
+        this.ciclosResolver = ciclosResolver;
+        this.memoriaRequerida = memoriaRequerida;
         
-        
-        // Inicialización de registros
-        this.pc = 0;
-        this.mar = 0;
+        this.instruccionesEjecutadas = 0;
+        this.interrupcionGenerada = false;
         this.estado = Estado.NUEVO;
-        this.ciclosBloqueadoRestantes = 0;
+        this.tiempoLlegada = 0;
+        this.tiempoPrimeraEjecucion = -1; 
+        this.tiempoFinalizacion = 0;
+        this.tiempoTotalBloqueado = 0;
         
-        
+        // Requerimiento: PC y MAR inician y avanzan linealmente
+        this.pc = 0;
+        this.mar = 1000; // Dirección base de memoria simulada
     }
-    
 
-    public Proceso(String nombre, int numInstrucciones, int deadline, int prioridad ) {
-        this.nombre = nombre;
-        this.totalInstrucciones = numInstrucciones;
-        this.deadline = deadline;
-        this.prioridadInicial = prioridad;
-    }
-            
-    
-    // --- Simulación de CPU ---
+    // --- MÉTODOS DE SIMULACIÓN DE EJECUCIÓN ---
 
-    // --- Lógica de CPU ---
-
-    public boolean ejecutarInstruccion() {
-        if (pc < totalInstrucciones) {
-            pc++;
-            mar++;
+    public void ejecutar(int cantidad) {
+        if (!estaTerminado()) {
+            instruccionesEjecutadas += cantidad;
+            // Requerimiento: PC y MAR incrementan una unidad por ciclo
+            pc += cantidad; 
+            mar += cantidad; 
+            if (instruccionesEjecutadas > totalInstrucciones) {
+                instruccionesEjecutadas = totalInstrucciones;
+            }
         }
-        return estaTerminado();
     }
-    
+
     public boolean estaTerminado() {
-        return pc >= totalInstrucciones;
-    }
-    
-    // --- Lógica de Bloqueo (E/S) ---
-    
-    public void establecerBloqueo(int ciclos) {
-        this.ciclosBloqueadoRestantes = ciclos;
-        this.estado = Estado.BLOQUEADO;
-    }
-    
-    public boolean reducirTiempoBloqueo() {
-        if (ciclosBloqueadoRestantes > 0) {
-            ciclosBloqueadoRestantes--;
-        }
-        return ciclosBloqueadoRestantes == 0; 
+        return instruccionesEjecutadas >= totalInstrucciones;
     }
 
-    // --- Getters y Setters ---
-    
-    public Integer getTotalInstrucciones(){return this.totalInstrucciones;}
-    public Integer getMAR(){return this.mar;}
-    public void setTiempoLlegada(long t) { 
-        this.tiempoLlegada = t; 
-    }
-    public long getTiempoLlegada() { return this.tiempoLlegada;}  
-    public int getTiempoLlegadaInt() {
-        return (int) this.tiempoLlegada;
-    }
+    // --- GETTERS Y SETTERS ---
+
     public String getId() { return id; }
     public String getNombre() { return nombre; }
-    public int getPrioridad() { return prioridadInicial; }
+    public int getTotalInstrucciones() { return totalInstrucciones; }
+    public int getInstruccionesEjecutadas() { return instruccionesEjecutadas; }
+    public int getInstruccionesRestantes() { return totalInstrucciones - instruccionesEjecutadas; }
     public int getDeadline() { return deadline; }
+    public int getPrioridad() { return prioridad; }
+    public boolean isEsSistema() { return esSistema; }
+    public int getPeriodo(){return this.periodo;}
     public Estado getEstado() { return estado; }
     public void setEstado(Estado estado) { this.estado = estado; }
-    public int getPC() { return pc; }
-    public int getInstruccionesRestantes() { return totalInstrucciones - pc; }
-    public boolean esDeSistema() { return esDeSistema; }
-    // --- MÉTODOS PARA MÉTRICAS ---
-    public void setTiempoPrimeraEjecucion(int tiempo) {
-        if (this.tiempoPrimeraEjecucion == -1) { // Solo guardamos la primera vez
-            this.tiempoPrimeraEjecucion = tiempo;
-        }
-    }
+    
+    public int getTiempoLlegadaInt() { return tiempoLlegada; }
+    public void setTiempoLlegada(int tiempoLlegada) { this.tiempoLlegada = tiempoLlegada; }
     
     public int getTiempoPrimeraEjecucion() { return tiempoPrimeraEjecucion; }
+    public void setTiempoPrimeraEjecucion(int tiempoPrimeraEjecucion) { this.tiempoPrimeraEjecucion = tiempoPrimeraEjecucion; }
     
-    public void agregarTiempoBloqueado() {
-        this.tiempoTotalBloqueado++;
-    }
-    
-    public int getTiempoTotalBloqueado() { return tiempoTotalBloqueado; }
-    
-    public void setTiempoFinalizacion(int tiempo) { this.tiempoFinalizacion = tiempo; }
     public int getTiempoFinalizacion() { return tiempoFinalizacion; }
+    public void setTiempoFinalizacion(int tiempoFinalizacion) { this.tiempoFinalizacion = tiempoFinalizacion; }
+    
+    public int getCicloExcepcion() { return cicloExcepcion; }
+    public int getCiclosResolver() { return ciclosResolver; }
+    
+    public boolean isInterrupcionGenerada() { return interrupcionGenerada; }
+    public void setInterrupcionGenerada(boolean interrupcionGenerada) { this.interrupcionGenerada = interrupcionGenerada; }
 
-    @Override
-    public String toString() {
-        return id + " | " + nombre + " (" + estado + ")";
-    }
+    public void sumarTiempoBloqueado(int ciclos) { this.tiempoTotalBloqueado += ciclos; }
+    public int getTiempoTotalBloqueado() { return tiempoTotalBloqueado; }
+    public void setMemoriaRequerida(int memoria){this.memoriaRequerida = memoria;}
+    public int getPC() { return pc; }
+    public int getMAR() { return mar; }
+    public int getMemoriaRequerida() { return memoriaRequerida; }
 }

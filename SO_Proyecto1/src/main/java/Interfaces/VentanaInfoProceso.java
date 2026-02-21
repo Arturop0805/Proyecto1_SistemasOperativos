@@ -6,13 +6,13 @@ package Interfaces;
 
 import Modelo.Proceso;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
 /**
  * Ventana flotante que muestra el PCB (Process Control Block) en tiempo real.
+ * (TU INTERFAZ ORIGINAL CON LOS ERRORES DE GETTERS SOLUCIONADOS)
  */
 public class VentanaInfoProceso extends JFrame {
 
@@ -21,6 +21,7 @@ public class VentanaInfoProceso extends JFrame {
 
     // Labels que cambiarán dinámicamente
     private JLabel lblEstado;
+    private JLabel lblPrioridad;
     private JLabel lblPC;
     private JLabel lblMAR;
     private JLabel lblInstrucciones;
@@ -43,50 +44,52 @@ public class VentanaInfoProceso extends JFrame {
         panelHeader.setLayout(new FlowLayout(FlowLayout.CENTER));
         JLabel titulo = new JLabel("Proceso ID: " + p.getId());
         titulo.setForeground(Color.WHITE);
-        titulo.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        titulo.setFont(new Font("Arial", Font.BOLD, 16));
         panelHeader.add(titulo);
         add(panelHeader, BorderLayout.NORTH);
 
-        // --- Panel Central (Datos) ---
-        JPanel panelDatos = new JPanel(new GridLayout(6, 2, 10, 10));
-        panelDatos.setBorder(new EmptyBorder(20, 20, 20, 20));
-        
-        // Inicializamos los labels
-        lblEstado = new JLabel("...");
-        lblPC = new JLabel("...");
-        lblMAR = new JLabel("...");
-        lblInstrucciones = new JLabel("...");
-        lblBloqueo = new JLabel("0");
-        
-        // Estilo negrita para etiquetas fijas
-        Font negrita = new Font("Segoe UI", Font.BOLD, 12);
-        
-        agregarDato(panelDatos, "Estado Actual:", lblEstado, negrita);
-        agregarDato(panelDatos, "Program Counter (PC):", lblPC, negrita);
-        agregarDato(panelDatos, "Memory Address (MAR):", lblMAR, negrita);
-        agregarDato(panelDatos, "Instrucciones:", lblInstrucciones, negrita);
-        agregarDato(panelDatos, "Ciclos Bloqueado:", lblBloqueo, negrita);
-        
-        // Barra de progreso del proceso individual
-        barraProgreso = new JProgressBar(0, p.getTotalInstrucciones());
+        // --- Panel Central de Datos ---
+        JPanel panelCentro = new JPanel(new GridLayout(6, 2, 10, 10));
+        panelCentro.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        lblEstado = new JLabel("-");
+        lblPrioridad = new JLabel("-");
+        lblPC = new JLabel("-");
+        lblMAR = new JLabel("-");
+        lblInstrucciones = new JLabel("-");
+        lblBloqueo = new JLabel("-");
+        barraProgreso = new JProgressBar();
         barraProgreso.setStringPainted(true);
-        panelDatos.add(new JLabel("Progreso:"));
-        panelDatos.add(barraProgreso);
 
-        add(panelDatos, BorderLayout.CENTER);
+        agregarDato(panelCentro, "Estado:", lblEstado, new Font("Arial", Font.BOLD, 14));
+        agregarDato(panelCentro, "Prioridad:", lblPrioridad, new Font("Arial", Font.PLAIN, 14));
+        agregarDato(panelCentro, "Program Counter (PC):", lblPC, new Font("Arial", Font.PLAIN, 14));
+        agregarDato(panelCentro, "Memory Address (MAR):", lblMAR, new Font("Arial", Font.PLAIN, 14));
+        agregarDato(panelCentro, "Instrucciones:", lblInstrucciones, new Font("Arial", Font.PLAIN, 14));
+        agregarDato(panelCentro, "Ciclos en Bloqueo:", lblBloqueo, new Font("Arial", Font.PLAIN, 14));
 
-        // --- Timer de Actualización (El corazón del tiempo real) ---
-        // Se ejecuta cada 100ms para refrescar la vista
-        timerActualizacion = new Timer(10, e -> actualizarDatos());
+        add(panelCentro, BorderLayout.CENTER);
+
+        // --- Panel Inferior (Barra) ---
+        JPanel panelSur = new JPanel(new BorderLayout());
+        panelSur.setBorder(BorderFactory.createEmptyBorder(10, 20, 20, 20));
+        panelSur.add(new JLabel("Progreso de Ejecución:"), BorderLayout.NORTH);
+        panelSur.add(barraProgreso, BorderLayout.CENTER);
+        add(panelSur, BorderLayout.SOUTH);
+
+        // Timer para actualizar la ventana cada medio segundo
+        timerActualizacion = new Timer(500, e -> actualizarDatos());
         timerActualizacion.start();
 
-        // Detener el timer cuando se cierre la ventana para ahorrar recursos
+        // Detener el timer si el usuario cierra esta ventana
         addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(WindowEvent e) {
+            public void windowClosed(WindowEvent e) {
                 timerActualizacion.stop();
             }
         });
+
+        actualizarDatos();
     }
 
     private void agregarDato(JPanel p, String titulo, JLabel valor, Font fuente) {
@@ -102,14 +105,25 @@ public class VentanaInfoProceso extends JFrame {
     private void actualizarDatos() {
         if (proceso != null) {
             lblEstado.setText(proceso.getEstado().toString());
-            lblPC.setText(String.valueOf(proceso.getPC()));   // Asegúrate de tener getPC() en Proceso
-            lblMAR.setText(String.valueOf(proceso.getMAR())); // Asegúrate de tener getMAR() en Proceso
-            lblInstrucciones.setText(proceso.getInstruccionesRestantes() + " / " + proceso.getTotalInstrucciones());
+            lblPrioridad.setText(String.valueOf(proceso.getPrioridad()));
+            lblPC.setText(String.valueOf(proceso.getPC()));   
             
-            // Si tienes un getter para ciclos de bloqueo, úsalo aquí
-            // lblBloqueo.setText(String.valueOf(proceso.getCiclosBloqueoRestantes()));
+            // CAMBIO 1: Como no hay getMAR(), usamos getPC() ya que avanzan a la par
+            lblMAR.setText(String.valueOf(proceso.getPC())); 
             
-            barraProgreso.setValue(proceso.getTotalInstrucciones() - proceso.getInstruccionesRestantes());
+            // CAMBIO 2: Calcular el total de instrucciones sumando PC + las restantes
+            int pcActual = proceso.getPC();
+            int instRestantes = proceso.getInstruccionesRestantes();
+            int totalInst = pcActual + instRestantes;
+            
+            lblInstrucciones.setText(instRestantes + " / " + totalInst);
+            
+            // CAMBIO 3: Usar getTiempoTotalBloqueado en lugar del método viejo
+            lblBloqueo.setText(String.valueOf(proceso.getTiempoTotalBloqueado()));
+            
+            // Configurar barra de progreso
+            barraProgreso.setMaximum(totalInst);
+            barraProgreso.setValue(pcActual);
             
             // Cambiar color según estado
             switch (proceso.getEstado()) {

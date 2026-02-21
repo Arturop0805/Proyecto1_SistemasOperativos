@@ -77,6 +77,9 @@ public class Reloj extends Thread {
     
     public void detener() { this.ejecutando = false; }
     public int getCicloActual() { return cicloActual; }
+    
     public void setVelocidad(int ms) { this.velocidadMs = ms; }
+    
+    // NUEVO: Método agregado para solucionar el error del Slider de la Interfaz
+    public void setDuracionCiclo(int ms) { this.velocidadMs = ms; }
 }
-
